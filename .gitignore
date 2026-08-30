@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+.idea/
+.vscode/
+
+# Paddle / model caches
+.paddlex/
+.paddleocr/
+
+# temporary outputs
+output/
+outputs/
