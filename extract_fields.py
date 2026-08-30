@@ -15,7 +15,9 @@ QUANTITY_UNITS = {
     "GM": "G", "GMS": "G", "G": "G", "KGS": "KG", "KG": "KG",
     "ML": "ML", "L": "L", "CM": "CM", "M": "M",
 }
-QUANTITY_LABEL_RE = re.compile(r"\b(?:NET\s*(?:QUANTITY|QTY|WT|WEIGHT)|QUANTITY|QTY)\b", re.I)
+QUANTITY_LABEL_RE = re.compile(
+    r"\b(?:NET\s*(?:QUANTITY|QTY|WT|WEIGHT|VOL|VOLUME)|QUANTITY|QTY)\b", re.I
+)
 MRP_LABEL_RE = re.compile(
     r"\b(?:M\s*\.?\s*R\s*\.?\s*P\.?|MAX(?:IMUM)?\s+RETAIL\s+PRICE|RETAIL\s+SALE\s+PRICE)\b", re.I
 )
@@ -40,14 +42,14 @@ ADDRESS_WORD_RE = re.compile(
     r"INDUSTRIAL|AREA|PLOT|PHASE|BLOCK|FLOOR|BUILDING|CENTRA|STATE|INDIA)\b", re.I
 )
 SECTION_STOP_RE = re.compile(
-    r"\b(?:MONTH\s*&\s*YEAR|NET\s*(?:QTY|QUANTITY|WT|WEIGHT)|M\s*\.?R\s*\.?P|BATCH|MFD|MFG|MTD|"
+    r"\b(?:MONTH\s*&\s*YEAR|NET\s*(?:QTY|QUANTITY|WT|WEIGHT|VOL|VOLUME)|M\s*\.?R\s*\.?P|BATCH|MFD|MFG|MTD|"
     r"MANUFACTURE\s+DATE|DATE\s+OF\s+MANUFACTURE|CUSTOMER\s+(?:CARE|COMPLAINTS?)|"
     r"CONSUMER\s+CARE|HELPLINE|CONTACT\s+US|"
     r"BEST\s+BEFORE|EXPIRY|SIZE|STYLE|COLOU?R|PRODUCT)\b", re.I
 )
 DECLARATION_SECTION_RE = re.compile(
     r"^\s*(?:MONTH\s*&\s*YEAR|MANUFACTURE\s+DATE|DATE\s+OF\s+MANUFACTURE|MFD\b|MFG\b|"
-    r"NET\s*(?:QUANTITY|QTY)\b|M\s*\.?R\s*\.?P\b|BATCH\b|STYLE\b|SIZE\b|COLOU?R\b|"
+    r"NET\s*(?:QUANTITY|QTY|WT|WEIGHT|VOL|VOLUME)\b|M\s*\.?R\s*\.?P\b|BATCH\b|STYLE\b|SIZE\b|COLOU?R\b|"
     r"PRODUCT\b|CUSTOMER\s+CARE\b|BEST\s+BEFORE\b|EXPIRY\b)", re.I
 )
 CARE_HEADER_RE = re.compile(
@@ -219,13 +221,15 @@ def _extract_quantity(items: list[dict[str, Any]]) -> dict[str, Any] | None:
     for label_index, label in enumerate(items):
         if not QUANTITY_LABEL_RE.search(label["text"]):
             continue
-        for candidate_index in [label_index, *_candidate_indices(items, label_index, radius=7)]:
+        same_item_value = _parse_quantity(label["text"])
+        if same_item_value:
+            value, unit = same_item_value
+            return {"value": value, "unit": unit, **_evidence(label)}
+        for candidate_index in _candidate_indices(items, label_index, radius=7):
             candidate = items[candidate_index]
             value = _parse_quantity(candidate["text"])
             if value:
                 score = 80 + _spatial_score(label, candidate) + candidate["confidence"] * 8
-                if candidate_index == label_index:
-                    score += 25
                 scored.append((score, candidate, value))
     if not scored:
         return None
@@ -235,31 +239,44 @@ def _extract_quantity(items: list[dict[str, Any]]) -> dict[str, Any] | None:
 
 
 def _parse_mrp(text: str) -> float | None:
-    if _parse_quantity(text) is not None or LICENSE_RE.search(text) or re.search(r"\b(?:BATCH|FSSAI)\b", text, re.I):
+    value_text = MRP_LABEL_RE.sub("", text, count=1).strip(" :;.-")
+    if _parse_quantity(value_text) is not None or LICENSE_RE.search(value_text) or re.search(r"\b(?:BATCH|FSSAI)\b", value_text, re.I):
         return None
-    if _parse_date(text) is not None:
+    if _parse_date(value_text) is not None:
         return None
-    compact = re.sub(r"\s", "", text)
+    compact = re.sub(r"\s", "", value_text)
     digits = re.sub(r"\D", "", compact)
     if len(digits) >= 6 or re.fullmatch(r"20\d{2}", compact):
         return None
-    if re.search(r"[A-Za-z]\d|\d[A-Za-z]", compact) and not re.search(r"(?:RS|INR)", text, re.I):
-        return None
-    match = re.search(r"(?:₹|\bRS\.?|\bINR)?\s*(\d{1,5}(?:\.\d{1,2})?)\s*(?:/-)?", text, re.I)
+    match = re.search(r"(?:₹|\bRS\.?|\bINR)?\s*(\d{1,5}(?:\.\d{1,2})?)\s*(?:/-)?", value_text, re.I)
     if not match:
+        return None
+    through_price = re.sub(r"\s", "", value_text[:match.end()])
+    if re.search(r"[A-Za-z]\d|\d[A-Za-z]", through_price) and not re.search(r"(?:RS|INR)", through_price, re.I):
         return None
     amount = float(match.group(1))
     return amount if 0 < amount < 100000 else None
 
 
+def _includes_all_taxes(text: str) -> bool:
+    compact = re.sub(r"[\W_]+", "", text).lower()
+    return "inclusiveofalltaxes" in compact or "inclofalltaxes" in compact
+
+
 def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
     full_text = "\n".join(item["text"] for item in items)
-    compact_match_text = re.sub(r"[\W_]+", "", full_text).lower()
     scored = []
     for label_index, label in enumerate(items):
         if not MRP_LABEL_RE.search(label["text"]):
             continue
-        for candidate_index in [label_index, *_candidate_indices(items, label_index, radius=8)]:
+        same_item_amount = _parse_mrp(label["text"])
+        if same_item_amount is not None:
+            return {
+                "currency": "INR", "value": same_item_amount,
+                "inclusive_of_all_taxes": _includes_all_taxes(full_text),
+                **_evidence(label),
+            }
+        for candidate_index in _candidate_indices(items, label_index, radius=8):
             candidate = items[candidate_index]
             amount = _parse_mrp(candidate["text"])
             if amount is None:
@@ -267,8 +284,6 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
             score = 85 + _spatial_score(label, candidate) + candidate["confidence"] * 8
             if re.search(r"₹|\bRS\.?|\bINR|/-", candidate["text"], re.I):
                 score += 18
-            if candidate_index == label_index:
-                score += 25
             if amount < 10 and not re.search(r"₹|RS|INR|/-", candidate["text"], re.I):
                 score -= 24
             scored.append((score, candidate, amount))
@@ -277,7 +292,7 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
     score, candidate, amount = max(scored, key=lambda entry: entry[0])
     return {
         "currency": "INR", "value": amount,
-        "inclusive_of_all_taxes": "inclusiveofalltaxes" in compact_match_text,
+        "inclusive_of_all_taxes": _includes_all_taxes(full_text),
         **_evidence(candidate, min(candidate["confidence"], score / 145)),
     }
 
@@ -475,6 +490,57 @@ def _extract_labeled_text(items: list[dict[str, Any]], label_re: re.Pattern[str]
     return None, None
 
 
+def _is_declaration_item(text: str) -> bool:
+    return bool(
+        QUANTITY_LABEL_RE.search(text)
+        or MRP_LABEL_RE.search(text)
+        or DATE_LABEL_RE.search(text)
+        or EXPIRY_LABEL_RE.search(text)
+        or PRODUCT_LABEL_RE.match(text)
+        or ROLE_HEADER_RE.search(text)
+        or CARE_HEADER_RE.search(text)
+        or LICENSE_RE.search(text)
+        or re.search(
+            r"^\s*(?:BATCH|ADDRESS|E-?MAIL|MADE\s+IN|COUNTRY\s+OF\s+ORIGIN)\b",
+            text,
+            re.I,
+        )
+    )
+
+
+def _is_product_candidate_line(item: dict[str, Any]) -> bool:
+    text = item["text"].strip()
+    if item["confidence"] < 0.85 or _is_declaration_item(text):
+        return False
+    if _looks_like_company(text) or _looks_like_address(text):
+        return False
+    if re.search(r"(?:₹|\d|@|https?://|www\.)", text, re.I):
+        return False
+    if not re.fullmatch(r"[A-Za-z][A-Za-z &'’.\-]{2,49}", text):
+        return False
+    return len(text.split()) <= 5
+
+
+def _infer_unlabeled_product(items: list[dict[str, Any]]) -> str | None:
+    """Conservatively infer a two-line product heading before declarations."""
+    declaration_index = next(
+        (index for index, item in enumerate(items) if _is_declaration_item(item["text"])),
+        None,
+    )
+    if declaration_index != 2:
+        return None
+
+    first, second = items[:2]
+    if not (_is_product_candidate_line(first) and _is_product_candidate_line(second)):
+        return None
+    maximum_gap = max(box_height(first["box"]), box_height(second["box"]), 1.0) * 1.5
+    if vertical_distance(first["box"], second["box"]) > maximum_gap:
+        return None
+    if same_column_score(first["box"], second["box"]) < 0.25:
+        return None
+    return f"{first['text']} {second['text']}"
+
+
 def extract_company_section(ocr_items, section_headers, start_index=None):
     """Backward-compatible organization helper."""
     items = _prepare_items(ocr_items)
@@ -494,6 +560,8 @@ def extract_fields(ocr_items):
     items = _prepare_items(ocr_items)
     organizations = _extract_organizations(items)
     product, _ = _extract_labeled_text(items, PRODUCT_LABEL_RE)
+    if product is None:
+        product = _infer_unlabeled_product(items)
     full_text = "\n".join(item["text"] for item in items)
     country_match = re.search(r"(?:MADE\s+IN|COUNTRY\s+OF\s+ORIGIN\s*[:\-]?)\s+([A-Z][A-Z ]{1,30})", full_text, re.I)
     country = country_match.group(1).strip().title() if country_match else None

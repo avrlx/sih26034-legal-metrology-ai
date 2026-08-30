@@ -6,7 +6,7 @@ __pycache__/
 .env.*
 .idea/
 .vscode/
-
+.testbyme/
 # Paddle / model caches
 .paddlex/
 .paddleocr/

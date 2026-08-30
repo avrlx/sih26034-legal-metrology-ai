@@ -63,6 +63,78 @@ class ExtractionRegressionTests(unittest.TestCase):
             self.assertNotIn("112193", address)
             self.assertNotIn("MORC", address)
 
+    def test_shampoo_real_ocr_regression(self):
+        result = extract_fields(load_ocr("shampoo_ocr.json"))
+
+        self.assertEqual(result["product"], "NOURISH SHAMPOO")
+        self.assertEqual(result["net_quantity"]["value"], 250.0)
+        self.assertEqual(result["net_quantity"]["unit"], "ML")
+        self.assertEqual(result["net_quantity"]["source_text"], "Net Vol: 250 ml")
+        self.assertEqual(result["mrp"]["value"], 349.0)
+        self.assertTrue(result["mrp"]["inclusive_of_all_taxes"])
+        self.assertEqual(result["mrp"]["source_text"], "MRP: ₹349.00 Incl. of all taxes")
+        self.assertEqual(result["manufacture_date"]["normalized"], "2026-09")
+        self.assertEqual(result["manufacturer"]["name"], "ABC Personal Care Pvt. Ltd.")
+        self.assertEqual(result["consumer_care"]["phone"], "1800-123-4567")
+        self.assertEqual(result["consumer_care"]["email"], "care@abcpersonalcare.in")
+        self.assertEqual(result["country_of_origin"], "India")
+
+    def test_same_line_quantity_formats(self):
+        cases = {
+            "Net Vol: 250 ml": (250.0, "ML"),
+            "Net Vol: 250ml": (250.0, "ML"),
+            "NET VOLUME 500 ML": (500.0, "ML"),
+            "Net Wt: 100 g": (100.0, "G"),
+            "Net Wt: 100g": (100.0, "G"),
+            "NET WEIGHT: 1 kg": (1.0, "KG"),
+            "Net Qty: 750 ml": (750.0, "ML"),
+            "NET QUANTITY 2 L": (2.0, "L"),
+            "Net Quantity: 50 PCS": (50.0, "N"),
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                item = {"text": text, "confidence": 0.97, "box": [1, 2, 101, 22], "source_image": "sample.jpg"}
+                quantity = extract_fields([item])["net_quantity"]
+                self.assertEqual((quantity["value"], quantity["unit"]), expected)
+                self.assertEqual(quantity["confidence"], 0.97)
+                self.assertEqual(quantity["source_text"], text)
+                self.assertEqual(quantity["source_box"], item["box"])
+                self.assertEqual(quantity["source_image"], "sample.jpg")
+
+    def test_same_line_mrp_formats(self):
+        cases = {
+            "MRP: ₹349.00": 349.0,
+            "MRP ₹349": 349.0,
+            "M.R.P.: 999.00": 999.0,
+            "MRP: Rs. 250": 250.0,
+            "MRP 250/-": 250.0,
+            "Maximum Retail Price: ₹499": 499.0,
+            "MRP: ₹349.00 Incl. of all taxes": 349.0,
+        }
+        for text, expected in cases.items():
+            with self.subTest(text=text):
+                item = {"text": text, "confidence": 0.96, "box": [2, 3, 102, 23]}
+                mrp = extract_fields([item])["mrp"]
+                self.assertEqual(mrp["value"], expected)
+                self.assertEqual(mrp["confidence"], 0.96)
+                self.assertEqual(mrp["source_text"], text)
+                self.assertEqual(mrp["source_box"], item["box"])
+
+    def test_unlabeled_product_inference_requires_confidence_and_adjacency(self):
+        low_confidence = [
+            {"text": "NOURISH", "confidence": 0.84, "box": [0, 0, 100, 18]},
+            {"text": "SHAMPOO", "confidence": 0.99, "box": [0, 20, 100, 38]},
+            {"text": "Net Vol: 250 ml", "confidence": 0.99, "box": [0, 40, 140, 58]},
+        ]
+        non_adjacent = [
+            {"text": "NOURISH", "confidence": 0.99, "box": [0, 0, 100, 18]},
+            {"text": "SHAMPOO", "confidence": 0.99, "box": [0, 100, 100, 118]},
+            {"text": "Net Vol: 250 ml", "confidence": 0.99, "box": [0, 120, 140, 138]},
+        ]
+
+        self.assertIsNone(extract_fields(low_confidence)["product"])
+        self.assertIsNone(extract_fields(non_adjacent)["product"])
+
     def test_semantic_formats_beat_nearby_numbers(self):
         lines = ["MRP", "560098", "February 2022", "50 PCS", "₹250/-", "NET QTY"]
         items = [{"text": text, "confidence": 0.95, "box": [0, i * 20, 100, i * 20 + 18]} for i, text in enumerate(lines)]
@@ -90,6 +162,8 @@ class ExtractionRegressionTests(unittest.TestCase):
             "inclusiveof all taxes",
             "inclusiveofalltaxes",
             "(INCLUSIVE OF ALL TAXES)",
+            "Incl. of all taxes",
+            "Incl of all taxes",
         ):
             with self.subTest(phrase=phrase):
                 lines = ["MRP", "999.00", phrase]

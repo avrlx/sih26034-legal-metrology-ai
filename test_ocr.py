@@ -14,7 +14,7 @@ from extract_fields import extract_fields
 from rules.engine import evaluate_compliance
 
 
-IMAGE_PATH = "samples/BestToTest.jpg"
+IMAGE_PATH = "samples/best.jpg" 
 MARKER_SIZE_MM = 50.0
 ARUCO_OCR_OVERLAP_THRESHOLD = 0.30
 
