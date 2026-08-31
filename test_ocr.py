@@ -10,6 +10,7 @@ from cv.aruco import detect_aruco_scale
 from cv.glyph_measurement import measure_net_quantity_numerals
 from cv.measurement import estimate_text_height_mm
 from cv.ocr_filter import filter_ocr_items_near_aruco
+from cv.ocr import predict_ocr_items, recover_split_quantity_items
 from cv.quality import analyze_image_quality
 from extract_fields import extract_fields
 from rules.engine import evaluate_compliance
@@ -32,28 +33,25 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
     print(json.dumps(calibration, indent=2))
 
     ocr = PaddleOCR(lang="en")
-    raw_ocr_items = []
-    for result in ocr.predict(image_path):
-        for text, score, box in zip(
-            result["rec_texts"], result["rec_scores"], result["rec_boxes"]
-        ):
-            raw_ocr_items.append(
-                {"text": text, "confidence": float(score), "box": box.tolist()}
-            )
+    raw_ocr_items = predict_ocr_items(ocr, image_path)
+    recovered_ocr_items, recovery = recover_split_quantity_items(
+        image_path, raw_ocr_items, ocr
+    )
 
     print("\n========== RAW OCR TEXT ==========\n")
     for item in raw_ocr_items:
         print(f"{item['text']} ({item['confidence']:.3f})")
 
     extraction_ocr_items = filter_ocr_items_near_aruco(
-        raw_ocr_items,
+        recovered_ocr_items,
         calibration.get("corners"),
         overlap_threshold=ARUCO_OCR_OVERLAP_THRESHOLD,
     )
     print("\n========== OCR MARKER FILTER ==========\n")
     print(
         f"raw={len(raw_ocr_items)}, extraction={len(extraction_ocr_items)}, "
-        f"removed={len(raw_ocr_items) - len(extraction_ocr_items)}"
+        f"removed={len(recovered_ocr_items) - len(extraction_ocr_items)}, "
+        f"quantity_crop_recovery={recovery}"
     )
 
     fields = extract_fields(extraction_ocr_items)

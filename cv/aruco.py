@@ -2,6 +2,33 @@ import cv2
 import numpy as np
 
 
+def _failure_diagnostics(gray, rejected):
+    contrast = float(gray.std())
+    blur_score = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    rejected_count = len(rejected or [])
+    warnings = []
+    if contrast < 25:
+        warnings.append("LOW_MARKER_CONTRAST_POSSIBLE")
+    if blur_score < 50:
+        warnings.append("MARKER_BLUR_POSSIBLE")
+    if rejected_count:
+        reason = "Quadrilateral candidates were found, but none decoded as the configured marker"
+    else:
+        reason = "No decodable marker candidate was found"
+    return {
+        "diagnostic": reason,
+        "failure_reason": reason,
+        "rejected_candidate_count": rejected_count,
+        "image_contrast": round(contrast, 2),
+        "image_blur_score": round(blur_score, 2),
+        "diagnostic_warnings": warnings,
+        "suggested_action": (
+            "Retake with the complete marker in frame, front-facing, sharp, and evenly lit"
+        ),
+        "calibration_confidence": 0.0,
+    }
+
+
 def detect_aruco_scale(image_path, marker_size_mm=50.0):
     image = cv2.imread(image_path)
 
@@ -30,7 +57,8 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
         return {
             "detected": False,
             "pixels_per_mm": None,
-            "marker_id": None
+            "marker_id": None,
+            **_failure_diagnostics(gray, rejected),
         }
 
     marker = corners[0][0]
@@ -67,6 +95,26 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
         average_size_px / marker_size_mm
     )
 
+    side_lengths = [top_width, bottom_width, left_height, right_height]
+    side_variation = float(np.std(side_lengths) / max(1.0, np.mean(side_lengths)))
+    height, width = gray.shape
+    border_margin = min(
+        float(marker[:, 0].min()), float(marker[:, 1].min()),
+        float(width - marker[:, 0].max()), float(height - marker[:, 1].max()),
+    )
+    border_score = max(0.0, min(1.0, border_margin / max(10.0, average_size_px * 0.15)))
+    geometry_score = max(0.0, min(1.0, 1.0 - side_variation / 0.30))
+    area_ratio = float(cv2.contourArea(marker.astype(np.float32)) / max(1, width * height))
+    size_score = max(0.0, min(1.0, area_ratio / 0.01))
+    confidence = geometry_score * 0.60 + border_score * 0.25 + size_score * 0.15
+    warnings = []
+    if side_variation > 0.20:
+        warnings.append("MARKER_PERSPECTIVE_DISTORTION")
+    if border_score < 0.8:
+        warnings.append("MARKER_NEAR_IMAGE_BOUNDARY")
+    if size_score < 0.7:
+        warnings.append("MARKER_SMALL_IN_FRAME")
+
     return {
         "detected": True,
         "marker_id": int(ids[0][0]),
@@ -79,5 +127,11 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
             float(pixels_per_mm),
             4
         ),
-        "corners": marker.tolist()
+        "corners": marker.tolist(),
+        "side_lengths_px": [round(float(value), 2) for value in side_lengths],
+        "relative_side_variation": round(side_variation, 4),
+        "marker_area_ratio": round(area_ratio, 6),
+        "border_margin_px": round(border_margin, 2),
+        "calibration_confidence": round(float(confidence), 3),
+        "diagnostic_warnings": warnings,
     }

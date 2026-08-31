@@ -197,11 +197,14 @@ def _candidate_indices(items: list[dict[str, Any]], label_index: int, radius: in
 
 
 def _evidence(item: dict[str, Any], confidence: float | None = None) -> dict[str, Any]:
-    return {
+    evidence = {
         "confidence": round(item["confidence"] if confidence is None else confidence, 3),
         "source_text": item["raw_text"], "source_box": item["box"],
         "source_image": item.get("source_image"),
     }
+    if isinstance(item.get("tokens"), list):
+        evidence["tokens"] = item["tokens"]
+    return evidence
 
 
 def _parse_quantity(text: str) -> tuple[float, str] | None:
@@ -216,6 +219,47 @@ def _parse_quantity(text: str) -> tuple[float, str] | None:
     return float(match.group(1)), QUANTITY_UNITS[match.group(2).upper()]
 
 
+_SPLIT_QUANTITY_RE = re.compile(
+    r"^\s*(\d+(?:\.\d+)?)\s*(PCS|PC|PIECES?|UNITS?|NOS|NO|N|U|KGS?|KG|GMS?|GM|G|ML|L|CM|M)\s*[.;,:-]?\s*$",
+    re.I,
+)
+_NON_QUANTITY_CONTEXT_RE = re.compile(
+    r"(?:₹|\bRS\.?\b|\bINR\b|/-|\bMRP\b|\bPRICE\b|\bBATCH\b|\bLOT\b|"
+    r"\bFSSAI\b|\bLIC(?:ENCE|ENSE)?\b|\bPIN\b|\bPHONE\b|\bMOB(?:ILE)?\b|"
+    r"\bMFD\b|\bMFG\b|\bEXP(?:IRY)?\b|\bBEST\s+BEFORE\b|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+    re.I,
+)
+
+
+def is_standalone_quantity_candidate(text: str) -> bool:
+    """Return whether a separate OCR line is unambiguously a quantity value."""
+    normalized = normalize_text(text)
+    return not _NON_QUANTITY_CONTEXT_RE.search(normalized) and bool(
+        _SPLIT_QUANTITY_RE.fullmatch(normalized)
+    )
+
+
+def _quantity_layout_score(label: dict[str, Any], candidate: dict[str, Any]) -> tuple[float, str]:
+    direction = relative_direction(label["box"], candidate["box"])
+    row = same_row_score(label["box"], candidate["box"])
+    column = same_column_score(label["box"], candidate["box"])
+    dx = horizontal_distance(label["box"], candidate["box"])
+    dy = vertical_distance(label["box"], candidate["box"])
+    height = max(1.0, box_height(label["box"]), box_height(candidate["box"]))
+    if row >= 0.45:
+        layout = "same_row"
+        priority = 48 if direction == "right" else 36
+    elif column >= 0.25 and direction == "below":
+        layout, priority = "below_label", 44
+    elif column >= 0.25 and direction == "above":
+        layout, priority = "above_label", 40
+    else:
+        layout, priority = "nearby", 12
+    distance_penalty = (dx + dy) / height * 7.0
+    alignment_bonus = max(row, column) * 24.0
+    return priority + alignment_bonus - distance_penalty, layout
+
+
 def _extract_quantity(items: list[dict[str, Any]]) -> dict[str, Any] | None:
     scored = []
     for label_index, label in enumerate(items):
@@ -224,18 +268,36 @@ def _extract_quantity(items: list[dict[str, Any]]) -> dict[str, Any] | None:
         same_item_value = _parse_quantity(label["text"])
         if same_item_value:
             value, unit = same_item_value
-            return {"value": value, "unit": unit, **_evidence(label)}
-        for candidate_index in _candidate_indices(items, label_index, radius=7):
-            candidate = items[candidate_index]
+            return {
+                "value": value, "unit": unit, "source_layout": "same_item",
+                "label_text": label["raw_text"], "label_box": label["box"],
+                **_evidence(label),
+            }
+        for candidate in items:
+            if candidate is label:
+                continue
+            if not is_standalone_quantity_candidate(candidate["text"]):
+                continue
+            if (
+                horizontal_distance(label["box"], candidate["box"])
+                + vertical_distance(label["box"], candidate["box"])
+                > max(260.0, box_height(label["box"]) * 7.0)
+            ):
+                continue
             value = _parse_quantity(candidate["text"])
             if value:
-                score = 80 + _spatial_score(label, candidate) + candidate["confidence"] * 8
-                scored.append((score, candidate, value))
+                layout_score, layout = _quantity_layout_score(label, candidate)
+                score = 80 + layout_score + candidate["confidence"] * 8
+                scored.append((score, candidate, value, label, layout))
     if not scored:
         return None
-    score, candidate, (value, unit) = max(scored, key=lambda entry: entry[0])
+    score, candidate, (value, unit), label, layout = max(scored, key=lambda entry: entry[0])
     confidence = min(candidate["confidence"], score / 140)
-    return {"value": value, "unit": unit, **_evidence(candidate, confidence)}
+    return {
+        "value": value, "unit": unit, "source_layout": layout,
+        "label_text": label["raw_text"], "label_box": label["box"],
+        **_evidence(candidate, confidence),
+    }
 
 
 def _parse_mrp(text: str) -> float | None:

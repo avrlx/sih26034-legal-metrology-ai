@@ -15,10 +15,13 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 import numpy as np
+import cv2
 
 from cv.aruco import detect_aruco_scale
 from cv.glyph_measurement import measure_net_quantity_numerals
 from cv.measurement import estimate_text_height_mm
+from cv.measurement_confidence import aggregate_measurement_confidence
+from cv.ocr import predict_ocr_items, recover_split_quantity_items
 from cv.ocr_filter import filter_ocr_items_near_aruco
 from cv.quality import analyze_image_quality
 from extract_fields import extract_fields
@@ -29,6 +32,8 @@ ARUCO_OCR_OVERLAP_THRESHOLD = 0.30
 DEFAULT_IMAGES = [Path("samples") / f"{index}.jpg" for index in range(1, 6)]
 JSON_OUTPUT = Path("results/measurement_validation.json")
 CSV_OUTPUT = Path("results/measurement_validation.csv")
+BEFORE_JSON = Path("results/measurement_validation_before.json")
+COMPARISON_CSV = Path("results/measurement_validation_comparison.csv")
 
 CSV_COLUMNS = [
     "image",
@@ -48,6 +53,11 @@ CSV_COLUMNS = [
     "glyph_height_px",
     "glyph_height_mm",
     "glyph_confidence",
+    "segmentation_confidence",
+    "localization_confidence",
+    "image_quality_factor",
+    "calibration_confidence",
+    "measurement_confidence",
     "glyph_status",
     "measurement_quality_flag",
     "suspected_outliers",
@@ -192,7 +202,12 @@ def internal_consistency_checks(result: dict[str, Any]) -> list[dict[str, Any]]:
         )
         box_px = box.get("height_px")
         box_mm = box.get("height_mm")
-        if isinstance(box_px, (int, float)) and isinstance(glyph_px, (int, float)):
+        adjacent_display_line = bool(glyph.get("adjacent_display_line_search"))
+        if (
+            not adjacent_display_line
+            and isinstance(box_px, (int, float))
+            and isinstance(glyph_px, (int, float))
+        ):
             add(
                 "glyph_not_taller_than_ocr_box_px",
                 glyph_px <= box_px,
@@ -203,7 +218,11 @@ def internal_consistency_checks(result: dict[str, Any]) -> list[dict[str, Any]]:
                 glyph_px < box_px * 0.90,
                 f"glyph_to_box_ratio={glyph_px / box_px:.3f}" if box_px else "ocr_box=0",
             )
-        if isinstance(box_mm, (int, float)) and isinstance(glyph_mm, (int, float)):
+        if (
+            not adjacent_display_line
+            and isinstance(box_mm, (int, float))
+            and isinstance(glyph_mm, (int, float))
+        ):
             add(
                 "glyph_not_taller_than_ocr_box_mm",
                 glyph_mm <= box_mm,
@@ -245,7 +264,7 @@ def generate_quality_flag(result: dict[str, Any]) -> tuple[str, list[str]]:
     if glyph.get("status") != "OK":
         reasons.append(glyph.get("reason") or "Glyph measurement is unavailable")
 
-    confidence = glyph.get("confidence")
+    confidence = glyph.get("measurement_confidence", glyph.get("confidence"))
     severe = bool(reasons)
     if isinstance(confidence, (int, float)):
         if confidence < 0.65:
@@ -265,11 +284,15 @@ def generate_quality_flag(result: dict[str, Any]) -> tuple[str, list[str]]:
         reasons.append(f"Extreme OCR-box perspective score ({factors['perspective']:.3f})")
     if isinstance(factors.get("crop_boundary"), (int, float)) and factors["crop_boundary"] < 1:
         reasons.append("Selected glyph component touched a crop boundary")
-    if isinstance(factors.get("source_box_overlap"), (int, float)) and factors["source_box_overlap"] < 0.5:
+    if (
+        not glyph.get("adjacent_display_line_search")
+        and isinstance(factors.get("source_box_overlap"), (int, float))
+        and factors["source_box_overlap"] < 0.5
+    ):
         reasons.append(
             f"Low glyph/source-box overlap ({factors['source_box_overlap']:.3f})"
         )
-    if glyph.get("value_region_method") == "substring_position_approximation":
+    if glyph.get("value_region_method") in {"substring_position_approximation", "substring_fallback"}:
         reasons.append(
             "Value-region location uses approximate substring geometry; inspect the debug image"
         )
@@ -316,19 +339,7 @@ def _record_failure(result: dict[str, Any], stage: str, reason: str) -> None:
 
 
 def _raw_ocr_items(ocr: Any, image_path: str) -> list[dict[str, Any]]:
-    items = []
-    for prediction in ocr.predict(image_path):
-        for text, score, box in zip(
-            prediction["rec_texts"],
-            prediction["rec_scores"],
-            prediction["rec_boxes"],
-        ):
-            items.append({
-                "text": str(text),
-                "confidence": float(score),
-                "box": box.tolist() if hasattr(box, "tolist") else list(box),
-            })
-    return items
+    return predict_ocr_items(ocr, image_path)
 
 
 def process_image(
@@ -375,8 +386,9 @@ def process_image(
 
         try:
             raw_items = _raw_ocr_items(ocr, image)
+            recovered_items, recovery = recover_split_quantity_items(image, raw_items, ocr)
             filtered_items = list(filter_ocr_items_near_aruco(
-                raw_items,
+                recovered_items,
                 result["aruco"].get("corners"),
                 overlap_threshold=ARUCO_OCR_OVERLAP_THRESHOLD,
             ))
@@ -384,6 +396,7 @@ def process_image(
                 "success": bool(raw_items),
                 "raw_item_count": len(raw_items),
                 "filtered_item_count": len(filtered_items),
+                "quantity_crop_recovery": recovery,
             }
             if not raw_items:
                 _record_failure(result, "ocr", "PaddleOCR returned no text")
@@ -402,7 +415,8 @@ def process_image(
                     key: extracted_quantity.get(key)
                     for key in (
                         "value", "unit", "confidence", "source_text",
-                        "source_box", "source_image",
+                        "source_box", "source_image", "tokens", "source_layout",
+                        "label_text", "label_box",
                     )
                 }
             else:
@@ -457,12 +471,18 @@ def process_image(
 
 
 def _finalize_image_result(result: dict[str, Any]) -> dict[str, Any]:
+    glyph = result.get("glyph_measurement") or {}
+    confidence_details = aggregate_measurement_confidence(
+        glyph, result.get("image_quality"), result.get("aruco")
+    )
+    glyph.update(confidence_details)
+    result["glyph_measurement"] = glyph
     result["consistency_checks"] = internal_consistency_checks(result)
     quality_flag, quality_reasons = generate_quality_flag(result)
     result["measurement_quality_flag"] = quality_flag
     result["measurement_quality_reasons"] = quality_reasons
+    _annotate_final_debug(glyph, quality_flag)
     result["suspected_outliers"] = quality_reasons
-    glyph = result.get("glyph_measurement") or {}
     fully_measured = (
         (result.get("image_quality") or {}).get("usable")
         and (result.get("aruco") or {}).get("detected")
@@ -474,6 +494,28 @@ def _finalize_image_result(result: dict[str, Any]) -> dict[str, Any]:
         result["failure_stage"] = None
         result["reason"] = None
     return make_json_safe(result)
+
+
+def _annotate_final_debug(glyph: dict[str, Any], quality_flag: str | None) -> None:
+    """Append final, quality-aware confidence to an already generated overlay."""
+    path = glyph.get("debug_image_path")
+    confidence = glyph.get("measurement_confidence")
+    if not path or not isinstance(confidence, (int, float)):
+        return
+    image = cv2.imread(str(path))
+    if image is None:
+        return
+    cv2.putText(
+        image,
+        f"measurement_confidence={confidence:.3f} | quality={quality_flag or 'PENDING'}",
+        (20, max(24, image.shape[0] - 22)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.58,
+        (180, 40, 180),
+        2,
+        cv2.LINE_AA,
+    )
+    cv2.imwrite(str(path), image)
 
 
 def process_batch(
@@ -514,9 +556,9 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         and item.get("measurement_quality_flag") in {"GOOD", "CHECK"}
     ]
     confidences = [
-        float(item["glyph_measurement"]["confidence"])
+        float(item["glyph_measurement"].get("measurement_confidence", item["glyph_measurement"]["confidence"]))
         for item in glyph_ok_results
-        if isinstance(item["glyph_measurement"].get("confidence"), (int, float))
+        if isinstance(item["glyph_measurement"].get("measurement_confidence", item["glyph_measurement"].get("confidence")), (int, float))
     ]
     heights = [
         float(item["glyph_measurement"]["estimated_numeral_height_mm"])
@@ -628,6 +670,11 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
         "glyph_height_px": glyph.get("estimated_numeral_height_px"),
         "glyph_height_mm": glyph.get("estimated_numeral_height_mm"),
         "glyph_confidence": glyph.get("confidence"),
+        "segmentation_confidence": glyph.get("segmentation_confidence", glyph.get("confidence")),
+        "localization_confidence": glyph.get("localization_confidence"),
+        "image_quality_factor": glyph.get("image_quality_factor"),
+        "calibration_confidence": glyph.get("calibration_confidence"),
+        "measurement_confidence": glyph.get("measurement_confidence"),
         "glyph_status": glyph.get("status"),
         "measurement_quality_flag": result.get("measurement_quality_flag"),
         "suspected_outliers": " | ".join(result.get("suspected_outliers") or []),
@@ -639,23 +686,74 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_before_after_comparison(
+    before_results: list[dict[str, Any]],
+    after_results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Serialize the small validation batch without dropping manual-GT fields."""
+    before_by_name = {Path(str(item.get("image"))).name: item for item in before_results}
+    comparison = []
+    for after in after_results:
+        name = Path(str(after.get("image"))).name
+        before = before_by_name.get(name, {})
+        before_glyph = before.get("glyph_measurement") or {}
+        after_glyph = after.get("glyph_measurement") or {}
+        comparison.append({
+            "image": name,
+            "before_quantity": (before.get("net_quantity") or {}).get("source_text"),
+            "after_quantity": (after.get("net_quantity") or {}).get("source_text"),
+            "before_glyph_status": before_glyph.get("status"),
+            "after_glyph_status": after_glyph.get("status"),
+            "before_height_mm": before_glyph.get("estimated_numeral_height_mm"),
+            "after_height_mm": after_glyph.get("estimated_numeral_height_mm"),
+            "before_confidence": before_glyph.get("measurement_confidence", before_glyph.get("confidence")),
+            "after_confidence": after_glyph.get("measurement_confidence", after_glyph.get("confidence")),
+            "before_quality_flag": before.get("measurement_quality_flag"),
+            "after_quality_flag": after.get("measurement_quality_flag"),
+            "change": (
+                "newly extracted and measured"
+                if before.get("net_quantity") is None and after_glyph.get("status") == "OK"
+                else "geometry localization corrected"
+                if before_glyph.get("status") != "OK" and after_glyph.get("status") == "OK"
+                else "confidence now includes image/calibration quality"
+                if after_glyph.get("status") == "OK"
+                else "remains REVIEW; no measurement claimed"
+            ),
+            "manual_height_mm": after.get("manual_height_mm", before.get("manual_height_mm")),
+            "absolute_error_mm": after.get("absolute_error_mm", before.get("absolute_error_mm")),
+            "percentage_error": after.get("percentage_error", before.get("percentage_error")),
+        })
+    return comparison
+
+
 def save_reports(
     results: list[dict[str, Any]],
     summary: dict[str, Any],
     *,
     json_path: str | Path = JSON_OUTPUT,
     csv_path: str | Path = CSV_OUTPUT,
+    before_json_path: str | Path | None = None,
+    comparison_csv_path: str | Path | None = None,
 ) -> None:
     json_output = Path(json_path)
     csv_output = Path(csv_path)
     json_output.parent.mkdir(parents=True, exist_ok=True)
     csv_output.parent.mkdir(parents=True, exist_ok=True)
+    before_results: list[dict[str, Any]] = []
+    if before_json_path is not None and Path(before_json_path).exists():
+        try:
+            before_report = json.loads(Path(before_json_path).read_text(encoding="utf-8"))
+            before_results = before_report.get("results") or []
+        except (OSError, ValueError, TypeError):
+            before_results = []
+    comparison = build_before_after_comparison(before_results, results)
     report = make_json_safe({
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "purpose": "Engineering validation only; not Rule 7 legal compliance",
         "marker_size_mm": MARKER_SIZE_MM,
         "results": results,
         "summary": summary,
+        "before_after": comparison,
     })
     with json_output.open("w", encoding="utf-8") as output:
         json.dump(report, output, indent=2, ensure_ascii=False, allow_nan=False)
@@ -668,6 +766,14 @@ def save_reports(
         )
         writer.writeheader()
         writer.writerows(_csv_row(result) for result in results)
+    if comparison_csv_path is not None:
+        comparison_output = Path(comparison_csv_path)
+        comparison_output.parent.mkdir(parents=True, exist_ok=True)
+        if comparison:
+            with comparison_output.open("w", encoding="utf-8", newline="") as output:
+                writer = csv.DictWriter(output, fieldnames=list(comparison[0]), lineterminator="\n")
+                writer.writeheader()
+                writer.writerows(comparison)
 
 
 def print_summary_table(results: list[dict[str, Any]]) -> None:
@@ -682,7 +788,7 @@ def print_summary_table(results: list[dict[str, Any]]) -> None:
         aruco_text = "YES" if (result.get("aruco") or {}).get("detected") else "NO"
         glyph = result.get("glyph_measurement") or {}
         height = glyph.get("estimated_numeral_height_mm")
-        confidence = glyph.get("confidence")
+        confidence = glyph.get("measurement_confidence", glyph.get("confidence"))
         height_text = f"{height:.3f}" if isinstance(height, (int, float)) else "--"
         confidence_text = (
             f"{confidence:.3f}" if isinstance(confidence, (int, float)) else "--"
@@ -699,7 +805,12 @@ def main() -> int:
     ocr = PaddleOCR(lang="en")
     results = process_batch(DEFAULT_IMAGES, ocr)
     summary = summarize_results(results)
-    save_reports(results, summary)
+    save_reports(
+        results,
+        summary,
+        before_json_path=BEFORE_JSON,
+        comparison_csv_path=COMPARISON_CSV,
+    )
     print_summary_table(results)
     print(f"\nReadiness: {summary['readiness']}")
     for reason in summary["readiness_reasoning"]:

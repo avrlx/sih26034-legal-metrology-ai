@@ -126,13 +126,14 @@ def filter_components(
     region_width: int,
     region_height: int,
     reference_height: float,
+    maximum_scale: float = 1.30,
 ) -> list[dict[str, Any]]:
     """Remove obvious connected-component noise while retaining narrow digits."""
     minimum_height = max(3, int(round(reference_height * 0.20)))
-    maximum_height = max(minimum_height, int(round(reference_height * 1.30)))
+    maximum_height = max(minimum_height, int(round(reference_height * maximum_scale)))
     minimum_area = max(3, int(round(reference_height * 0.45)))
     maximum_area = max(minimum_area, int(region_width * region_height * 0.20))
-    maximum_width = max(3, int(round(reference_height * 1.35)))
+    maximum_width = max(3, int(round(reference_height * max(1.35, maximum_scale))))
 
     filtered = []
     for component in components:
@@ -233,6 +234,29 @@ def _foreground_mask(gray: np.ndarray) -> tuple[np.ndarray, str, float]:
     return mask, polarity, ratio
 
 
+def _foreground_masks(gray: np.ndarray) -> list[tuple[np.ndarray, str, float]]:
+    """Return conservative preprocessing variants for difficult print/lighting."""
+    normalized = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(4, 4)).apply(gray)
+    attempts: list[tuple[np.ndarray, str, float]] = []
+    for source, prefix in ((gray, "raw"), (normalized, "clahe")):
+        for mode, polarity in (
+            (cv2.THRESH_BINARY_INV, "dark_on_light"),
+            (cv2.THRESH_BINARY, "light_on_dark"),
+        ):
+            _, mask = cv2.threshold(source, 0, 255, mode | cv2.THRESH_OTSU)
+            attempts.append((mask, f"{prefix}_otsu_{polarity}", float(np.count_nonzero(mask) / mask.size)))
+    block_size = max(11, min(51, (min(gray.shape) // 4) | 1))
+    for mode, polarity in (
+        (cv2.THRESH_BINARY_INV, "dark_on_light"),
+        (cv2.THRESH_BINARY, "light_on_dark"),
+    ):
+        mask = cv2.adaptiveThreshold(
+            normalized, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, mode, block_size, 7
+        )
+        attempts.append((mask, f"clahe_adaptive_{polarity}", float(np.count_nonzero(mask) / mask.size)))
+    return attempts
+
+
 def _connected_components(mask: np.ndarray, crop_box: tuple[int, int, int, int]) -> list[dict[str, Any]]:
     count, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     crop_x1, crop_y1, _, _ = crop_box
@@ -295,11 +319,26 @@ def _select_digit_components(
         # A genuine '1' can be much narrower than its neighbours. Without a 1,
         # a single narrow full-height candidate is more likely label punctuation.
         width_weight = 0.05 if "1" in numeric_text else 0.35
+        shape_penalty = 0.0
+        if len(numeric_text) == len(group):
+            for digit, width, height in zip(numeric_text, widths, heights):
+                aspect = float(width / max(1.0, height))
+                if digit == "1":
+                    shape_penalty += aspect * 0.45 + max(0.0, aspect - 0.48) * 1.8
+                elif aspect < 0.16:
+                    shape_penalty += (0.16 - aspect) * 1.5
+            shape_penalty /= len(group)
+        baselines = np.asarray([component["box"][3] for component in group], dtype=float)
+        line_penalty = float(np.std(baselines) / max(1.0, np.mean(heights)))
+        size_reward = min(1.5, float(np.mean(heights)) / max(1.0, reference_width * 0.18))
         score = (
             consistency
             + center_distance * 0.35
             + gap_penalty * 0.15
             + width_penalty * width_weight
+            + shape_penalty
+            + line_penalty * 1.5
+            - size_reward * 0.35
         )
         if best is None or score < best[0]:
             best = (score, group)
@@ -329,7 +368,9 @@ def _geometry_value_region(
             x1 = max(crop_x1, int(math.floor(min(box[0] for box in digit_bounds))))
             x2 = min(crop_x2, int(math.ceil(max(box[2] for box in digit_bounds))))
             if x2 > x1:
-                return [x1, crop_y1, x2, crop_y2], "character_geometry"
+                y1 = max(crop_y1, int(math.floor(min(box[1] for box in digit_bounds))))
+                y2 = min(crop_y2, int(math.ceil(max(box[3] for box in digit_bounds))))
+                return [x1, y1, x2, y2], "ocr_character_geometry"
 
     for key in ("source_tokens", "ocr_tokens", "tokens"):
         entries = net_quantity.get(key)
@@ -344,7 +385,7 @@ def _geometry_value_region(
             bounds = _box_bounds(entry.get("box"))
             if bounds is None:
                 continue
-            x1, _, x2, _ = bounds
+            x1, y1, x2, y2 = bounds
             token_start = token_text.replace(",", ".").find(numeric_token)
             token_length = max(1, len(token_text))
             left = x1 + (x2 - x1) * token_start / token_length
@@ -352,7 +393,12 @@ def _geometry_value_region(
             left_i = max(crop_x1, int(math.floor(left)))
             right_i = min(crop_x2, int(math.ceil(right)))
             if right_i > left_i:
-                return [left_i, crop_y1, right_i, crop_y2], "token_geometry"
+                return [
+                    left_i,
+                    max(crop_y1, int(math.floor(y1))),
+                    right_i,
+                    min(crop_y2, int(math.ceil(y2))),
+                ], "ocr_token_geometry"
     return None
 
 
@@ -380,6 +426,7 @@ def _save_debug_image(
     digit_boxes: list[list[int]],
     rejected_boxes: list[list[int]],
     estimated_height_mm: float | None,
+    annotation: str,
     debug_image_path: str,
 ) -> bool:
     debug = image.copy()
@@ -401,6 +448,16 @@ def _save_debug_image(
             2,
             cv2.LINE_AA,
         )
+    cv2.putText(
+        debug,
+        annotation,
+        (source_box[0], min(debug.shape[0] - 8, source_box[3] + 24)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.48,
+        (80, 80, 0),
+        1,
+        cv2.LINE_AA,
+    )
     path = Path(debug_image_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     return bool(cv2.imwrite(str(path), debug))
@@ -464,7 +521,23 @@ def measure_net_quantity_numerals(
     source_width = source_x2 - source_x1
     source_height = source_y2 - source_y1
 
-    # Start with only a small configurable padding. If a plausible target-region
+    full_image_box = (0, 0, image_width, image_height)
+    full_geometry_region = _geometry_value_region(
+        net_quantity, numeric_text, numeric_token, full_image_box
+    )
+    label_bounds = _box_bounds(net_quantity.get("label_box"))
+    label_height = (
+        max(1.0, label_bounds[3] - label_bounds[1]) if label_bounds is not None else source_height
+    )
+    display_line_geometry = bool(
+        full_geometry_region is not None
+        and net_quantity.get("source_layout") != "same_item"
+        and source_height >= label_height * 1.7
+    )
+
+    # Start with only a small configurable padding. If token geometry shows a
+    # compact OCR declaration above a larger display line, include the adjacent
+    # line and let exact-count/baseline/size scoring choose the numeral group.
     # component is visibly clipped by the top/bottom crop boundary, the crop is
     # extended only in that direction to complete it. This recovery is important
     # for OCR rectangles whose vertical placement is imperfect, while avoiding a
@@ -475,7 +548,34 @@ def measure_net_quantity_numerals(
         else max(0, int(padding_px))
     )
     crop_strategy = "small_padding"
-    crop_box = clamp_box(source_box_value, image_width, image_height, search_padding)
+    if display_line_geometry:
+        crop_box = clamp_box(
+            [
+                source_x1 - source_width * 0.18,
+                source_y1 - search_padding,
+                source_x2 + source_width * 0.25,
+                source_y2 + search_padding,
+            ],
+            image_width,
+            image_height,
+        )
+        crop_strategy = "ocr_geometry_display_line"
+    elif full_geometry_region is not None:
+        token_region, value_region_method = full_geometry_region
+        token_height = max(1, token_region[3] - token_region[1])
+        crop_box = clamp_box(
+            [
+                source_x1 - source_width * 0.45,
+                min(source_y1, token_region[1]) - token_height * 0.35,
+                source_x2 + source_width * 0.18,
+                max(source_y2, token_region[3]) + token_height * 3.2,
+            ],
+            image_width,
+            image_height,
+        )
+        crop_strategy = "ocr_geometry_adjacent_line_search"
+    else:
+        crop_box = clamp_box(source_box_value, image_width, image_height, search_padding)
     if crop_box is None:
         return _review("Net quantity crop is invalid", numeric_text=numeric_text, **common_evidence)
     crop_x1, crop_y1, crop_x2, crop_y2 = crop_box
@@ -483,13 +583,23 @@ def measure_net_quantity_numerals(
     if crop.size == 0:
         return _review("Net quantity crop is empty", numeric_text=numeric_text, **common_evidence)
 
-    direct_region = _geometry_value_region(
-        net_quantity, numeric_text, numeric_token, crop_box
-    )
-    if direct_region is not None:
-        value_region_box, value_region_method = direct_region
-        value_x1, _, value_x2, _ = value_region_box
-        expected_center_x = (value_x1 + value_x2) / 2
+    if display_line_geometry:
+        token_region, value_region_method = full_geometry_region
+        token_width = max(1, token_region[2] - token_region[0])
+        token_height = max(1, token_region[3] - token_region[1])
+        value_region_box = [
+            max(crop_x1, int(token_region[0] - token_width * 0.18)),
+            max(crop_y1, int(token_region[1] - token_height * 0.12)),
+            min(crop_x2, int(token_region[2] + token_width * 0.24)),
+            min(crop_y2, int(token_region[3] + token_height * 0.12)),
+        ]
+        value_x1, value_x2 = value_region_box[0], value_region_box[2]
+        expected_center_x = (token_region[0] + token_region[2]) / 2
+    elif full_geometry_region is not None:
+        _, value_region_method = full_geometry_region
+        value_region_box = [crop_x1, crop_y1, crop_x2, crop_y2]
+        value_x1, value_x2 = crop_x1, crop_x2
+        expected_center_x = (source_x1 + source_x2) / 2
     else:
         text_length = max(1, len(source_text))
         approximate_character_width = source_width / text_length
@@ -506,7 +616,7 @@ def measure_net_quantity_numerals(
         value_x2 = min(crop_x2, int(math.ceil(numeric_x2 + approximate_character_width)))
         value_region_box = [value_x1, crop_y1, value_x2, crop_y2]
         expected_center_x = (numeric_x1 + numeric_x2) / 2
-        value_region_method = "substring_position_approximation"
+        value_region_method = "substring_fallback"
 
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     mask, polarity, foreground_ratio = _foreground_mask(gray)
@@ -536,24 +646,55 @@ def measure_net_quantity_numerals(
             crop_box = (crop_x1, expanded_y1, crop_x2, expanded_y2)
             crop_x1, crop_y1, crop_x2, crop_y2 = crop_box
             crop = image[crop_y1:crop_y2, crop_x1:crop_x2]
-            value_region_box[1] = crop_y1
-            value_region_box[3] = crop_y2
+            if value_region_method == "substring_fallback":
+                value_region_box[1] = crop_y1
+                value_region_box[3] = crop_y2
             gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
             mask, polarity, foreground_ratio = _foreground_mask(gray)
             raw_components = _connected_components(mask, crop_box)
             crop_strategy = "adaptive_vertical_completion"
 
-    components = filter_components(
-        raw_components, crop.shape[1], crop.shape[0], source_height
-    )
-    components = merge_split_components(components, source_height)
-    candidates = []
-    for component in components:
-        box_x1, box_y1, box_x2, box_y2 = component["box"]
-        center_x = (box_x1 + box_x2) / 2
-        vertical_intersection = max(0, min(box_y2, source_y2) - max(box_y1, source_y1))
-        if value_x1 <= center_x <= value_x2 and vertical_intersection > 0:
-            candidates.append(component)
+    # Retry several conservative segmentation variants. Prefer exact digit count,
+    # then height agreement and proximity to the OCR token's visual line.
+    best_attempt: tuple[float, str, float, list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]] | None = None
+    value_y1, value_y2 = value_region_box[1], value_region_box[3]
+    for attempt_mask, attempt_name, attempt_ratio in _foreground_masks(gray):
+        attempt_raw = _connected_components(attempt_mask, crop_box)
+        attempt_components = merge_split_components(
+            filter_components(
+                attempt_raw,
+                crop.shape[1],
+                crop.shape[0],
+                source_height,
+                maximum_scale=3.2 if full_geometry_region is not None and not display_line_geometry else 1.3,
+            ),
+            source_height,
+        )
+        attempt_candidates = []
+        for component in attempt_components:
+            box_x1, box_y1, box_x2, box_y2 = component["box"]
+            center_x = (box_x1 + box_x2) / 2
+            visual_line_overlap = max(0, min(box_y2, value_y2) - max(box_y1, value_y1))
+            source_overlap = max(0, min(box_y2, source_y2) - max(box_y1, source_y1))
+            if value_x1 <= center_x <= value_x2 and max(visual_line_overlap, source_overlap) > 0:
+                attempt_candidates.append(component)
+        attempt_selected = _select_digit_components(
+            attempt_candidates, expected_digit_count, expected_center_x, source_width, numeric_text
+        )
+        heights = [float(component["height"]) for component in attempt_selected]
+        count_error = abs(len(attempt_selected) - expected_digit_count)
+        height_variation = float(np.std(heights) / max(1.0, np.mean(heights))) if len(heights) > 1 else 0.0
+        foreground_penalty = abs(attempt_ratio - 0.15)
+        retry_penalty = 0.60 if "adaptive" in attempt_name else (0.10 if attempt_name.startswith("raw") else 0.0)
+        score = count_error * 10.0 + height_variation * 3.0 + foreground_penalty + retry_penalty
+        if best_attempt is None or score < best_attempt[0]:
+            best_attempt = (
+                score, attempt_name, attempt_ratio, attempt_components,
+                attempt_candidates, attempt_selected,
+            )
+    assert best_attempt is not None
+    _, preprocessing_method, foreground_ratio, components, candidates, preselected = best_attempt
+    polarity = "dark_on_light" if preprocessing_method.endswith("dark_on_light") else "light_on_dark"
 
     evidence = {
         **common_evidence,
@@ -563,11 +704,16 @@ def measure_net_quantity_numerals(
         "crop_box": list(crop_box),
         "crop_dimensions": {"width": int(crop.shape[1]), "height": int(crop.shape[0])},
         "crop_strategy": crop_strategy,
+        "adjacent_display_line_search": bool(
+            full_geometry_region is not None and not display_line_geometry
+        ),
         "padding_px": search_padding,
         "value_region_box": value_region_box,
         "value_region_method": value_region_method,
         "pixels_per_mm": round(calibration_value, 4),
         "threshold_polarity": polarity,
+        "preprocessing_method": preprocessing_method,
+        "segmentation_attempt_count": len(_foreground_masks(gray)),
         "foreground_ratio": round(foreground_ratio, 4),
         "expected_digit_count": expected_digit_count,
     }
@@ -606,17 +752,12 @@ def measure_net_quantity_numerals(
                 digit_boxes,
                 rejected_boxes,
                 None,
+                f"numeric={numeric_text} | {value_region_method} | seg_conf={confidence:.3f}",
                 requested_path,
             )
         return result
 
-    selected = _select_digit_components(
-        candidates,
-        expected_digit_count,
-        expected_center_x,
-        source_width,
-        numeric_text,
-    )
+    selected = preselected
     if len(selected) != expected_digit_count:
         return segmentation_review(
             "Numeral segmentation did not match the expected digit count",
@@ -650,7 +791,7 @@ def measure_net_quantity_numerals(
     ocr_confidence = max(0.0, min(1.0, ocr_confidence))
     foreground_score = max(0.0, 1.0 - abs(foreground_ratio - 0.15) / 0.35)
     count_score = min(len(selected), expected_digit_count) / expected_digit_count
-    region_score = 1.0 if value_region_method in {"character_geometry", "token_geometry"} else 0.82
+    region_score = 1.0 if value_region_method in {"ocr_character_geometry", "ocr_token_geometry"} else 0.72
     perspective_score = _perspective_score(source_box_value)
     boundary_score = 0.6 if any(component.get("touches_crop_boundary") for component in selected) else 1.0
     source_overlap_score = float(np.mean([
@@ -698,6 +839,9 @@ def measure_net_quantity_numerals(
         "estimated_numeral_height_px": round(float(estimated_height_px), 2),
         "estimated_numeral_height_mm": round(float(estimated_height_mm), 3),
         "confidence": round(float(min(1.0, confidence)), 3),
+        "segmentation_confidence": round(float(min(1.0, confidence)), 3),
+        "localization_method": value_region_method,
+        "localization_confidence": round(region_score, 3),
     }
     if debug and not debug_image_path:
         output_directory = Path(debug_dir) if debug_dir is not None else Path("debug")
@@ -711,6 +855,7 @@ def measure_net_quantity_numerals(
             digit_boxes,
             rejected_boxes,
             estimated_height_mm,
+            f"numeric={numeric_text} | {value_region_method} | seg_conf={confidence:.3f}",
             debug_image_path,
         )
     return result
