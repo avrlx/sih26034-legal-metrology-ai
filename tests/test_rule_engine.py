@@ -39,6 +39,22 @@ class RuleEngineTests(unittest.TestCase):
         self.assertEqual(validate_unit_scale(fields["net_quantity"])[0], "NOT_APPLICABLE")
         self.assertEqual(evaluate_font_height_applicability(fields)[0], "NOT_APPLICABLE")
 
+    def test_rule_7_stays_review_even_with_glyph_measurement(self):
+        fields = {
+            "net_quantity": {
+                "value": 250,
+                "unit": "ML",
+                "glyph_measurement": {
+                    "status": "OK",
+                    "estimated_numeral_height_mm": 2.609,
+                    "confidence": 0.79,
+                },
+            }
+        }
+        status, reason = evaluate_font_height_applicability(fields)
+        self.assertEqual(status, "REVIEW")
+        self.assertEqual(reason, "Physical font measurement requires calibrated image analysis")
+
     def test_structured_manufacture_date_passes(self):
         value = {"raw": "February 2022", "normalized": "2022-02", "type": "manufacture_month_year"}
         self.assertEqual(validate_month_year(value)[0], "PASS")

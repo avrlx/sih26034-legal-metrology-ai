@@ -7,7 +7,7 @@ environment with PaddleOCR installed to exercise the full image pipeline.
 import json
 
 from cv.aruco import detect_aruco_scale
-from cv.glyph_measurement import measure_net_quantity_numeral_height
+from cv.glyph_measurement import measure_net_quantity_numerals
 from cv.measurement import estimate_text_height_mm
 from cv.ocr_filter import filter_ocr_items_near_aruco
 from cv.quality import analyze_image_quality
@@ -72,10 +72,11 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
         net_qty["measurement"] = measurement
 
     if net_qty and isinstance(net_qty, dict):
-        glyph_measurement = measure_net_quantity_numeral_height(
+        glyph_measurement = measure_net_quantity_numerals(
             image_path,
             net_qty,
             calibration.get("pixels_per_mm"),
+            debug=True,
         )
         net_qty["glyph_measurement"] = glyph_measurement
 
@@ -89,7 +90,7 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
     else:
         print("Measurement unavailable: ArUco calibration failed.")
 
-    print("\n========== NET QUANTITY GLYPH MEASUREMENT ==========\n")
+    print("\n========== GLYPH MEASUREMENT ==========\n")
     if glyph_measurement:
         print(json.dumps(glyph_measurement, indent=2))
     else:
