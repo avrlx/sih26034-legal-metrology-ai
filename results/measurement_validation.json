@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-01T13:12:07.055529+00:00",
-  "purpose": "Engineering validation only; not Rule 7 legal compliance",
+  "generated_at": "2026-09-01T13:50:31.134978+00:00",
+  "purpose": "LM-R9-002 prototype contrast evidence using implementation-defined engineering thresholds; not a statutory numeric threshold. LM-R7-001 remains REVIEW.",
   "marker_size_mm": 50.0,
   "results": [
     {
@@ -135,6 +135,208 @@
           484,
           687
         ]
+      },
+      "mrp": {
+        "currency": "INR",
+        "value": 145.0,
+        "inclusive_of_all_taxes": true,
+        "confidence": 0.982,
+        "source_text": "MRP: ₹145.00 Incl. of all taxes",
+        "source_box": [
+          261,
+          1025,
+          948,
+          1085
+        ],
+        "source_image": null,
+        "tokens": [
+          {
+            "text": "MRP",
+            "box": [
+              286,
+              1034,
+              362,
+              1075
+            ]
+          },
+          {
+            "text": ": ₹",
+            "box": [
+              379,
+              1034,
+              430,
+              1075
+            ]
+          },
+          {
+            "text": "145.00",
+            "box": [
+              447,
+              1034,
+              583,
+              1075
+            ]
+          },
+          {
+            "text": "Incl",
+            "box": [
+              608,
+              1034,
+              676,
+              1075
+            ]
+          },
+          {
+            "text": ". ",
+            "box": [
+              685,
+              1034,
+              702,
+              1075
+            ]
+          },
+          {
+            "text": "of",
+            "box": [
+              719,
+              1034,
+              744,
+              1075
+            ]
+          },
+          {
+            "text": "all",
+            "box": [
+              769,
+              1034,
+              812,
+              1075
+            ]
+          },
+          {
+            "text": "taxes",
+            "box": [
+              837,
+              1034,
+              931,
+              1075
+            ]
+          }
+        ]
+      },
+      "contrast_evidence": {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": {
+          "NET_QUANTITY": {
+            "status": "OK",
+            "target": "NET_QUANTITY",
+            "ocr_text": "1L",
+            "numeric_text": "1",
+            "target_box": [
+              312,
+              737,
+              431,
+              928
+            ],
+            "background_ring_box": [
+              169,
+              594,
+              574,
+              1071
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 0.9,
+            "foreground_luminance": 0.06761,
+            "background_luminance": 0.921582,
+            "luminance_difference": 0.853972,
+            "contrast_ratio": 8.261,
+            "lab_color_difference": 171.959,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 9679,
+            "background_sample_count": 106983,
+            "foreground_fraction": 0.4258,
+            "background_luminance_range_p10_p90": 0.1121,
+            "background_lab_dispersion": 3.0,
+            "local_glare_ratio": 0.4496,
+            "confidence": 0.9,
+            "confidence_factors": {
+              "ocr": 0.98,
+              "localization": 0.9,
+              "separation": 1.0,
+              "background_uniformity": 0.491,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_1_contrast_net_quantity.jpg",
+            "debug_image_saved": true
+          },
+          "MRP": {
+            "status": "OK",
+            "target": "MRP",
+            "ocr_text": "MRP: ₹145.00 Incl. of all taxes",
+            "numeric_text": "145.00",
+            "target_box": [
+              445,
+              1032,
+              585,
+              1077
+            ],
+            "background_ring_box": [
+              411,
+              998,
+              619,
+              1111
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.003728,
+            "background_luminance": 0.889132,
+            "luminance_difference": 0.885403,
+            "contrast_ratio": 17.479,
+            "lab_color_difference": 235.0,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 1755,
+            "background_sample_count": 10898,
+            "foreground_fraction": 0.2786,
+            "background_luminance_range_p10_p90": 0.0658,
+            "background_lab_dispersion": 2.0,
+            "local_glare_ratio": 0.244,
+            "confidence": 0.952,
+            "confidence_factors": {
+              "ocr": 0.982,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.701,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_1_contrast_mrp.jpg",
+            "debug_image_saved": true
+          }
+        }
+      },
+      "lm_r9_002": {
+        "status": "PASS",
+        "reason": "Both declarations meet the implementation-defined engineering contrast threshold (not a statutory threshold)"
       },
       "ocr_box_measurement": {
         "height_px": 198.0,
@@ -493,6 +695,208 @@
           767
         ]
       },
+      "mrp": {
+        "currency": "INR",
+        "value": 110.0,
+        "inclusive_of_all_taxes": true,
+        "confidence": 0.995,
+        "source_text": "MRP: ₹110.00 Incl. of all taxes",
+        "source_box": [
+          318,
+          1021,
+          935,
+          1075
+        ],
+        "source_image": null,
+        "tokens": [
+          {
+            "text": "MRP",
+            "box": [
+              340,
+              1021,
+              414,
+              1075
+            ]
+          },
+          {
+            "text": ": ₹",
+            "box": [
+              428,
+              1021,
+              472,
+              1075
+            ]
+          },
+          {
+            "text": "110.00",
+            "box": [
+              487,
+              1021,
+              611,
+              1075
+            ]
+          },
+          {
+            "text": "Incl",
+            "box": [
+              633,
+              1021,
+              699,
+              1075
+            ]
+          },
+          {
+            "text": ". ",
+            "box": [
+              706,
+              1021,
+              721,
+              1075
+            ]
+          },
+          {
+            "text": "of",
+            "box": [
+              735,
+              1021,
+              757,
+              1075
+            ]
+          },
+          {
+            "text": "all",
+            "box": [
+              779,
+              1021,
+              816,
+              1075
+            ]
+          },
+          {
+            "text": "taxes",
+            "box": [
+              830,
+              1021,
+              925,
+              1075
+            ]
+          }
+        ]
+      },
+      "contrast_evidence": {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": {
+          "NET_QUANTITY": {
+            "status": "OK",
+            "target": "NET_QUANTITY",
+            "ocr_text": "Net Vol: 500 ml",
+            "numeric_text": "500",
+            "target_box": [
+              527,
+              713,
+              601,
+              769
+            ],
+            "background_ring_box": [
+              485,
+              671,
+              643,
+              811
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.020675,
+            "background_luminance": 0.715455,
+            "luminance_difference": 0.69478,
+            "contrast_ratio": 10.831,
+            "lab_color_difference": 184.141,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 1270,
+            "background_sample_count": 10796,
+            "foreground_fraction": 0.3065,
+            "background_luminance_range_p10_p90": 0.0706,
+            "background_lab_dispersion": 3.162,
+            "local_glare_ratio": 0.0008,
+            "confidence": 0.952,
+            "confidence_factors": {
+              "ocr": 1.0,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.679,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_2_contrast_net_quantity.jpg",
+            "debug_image_saved": true
+          },
+          "MRP": {
+            "status": "OK",
+            "target": "MRP",
+            "ocr_text": "MRP: ₹110.00 Incl. of all taxes",
+            "numeric_text": "110.00",
+            "target_box": [
+              485,
+              1019,
+              613,
+              1077
+            ],
+            "background_ring_box": [
+              441,
+              975,
+              657,
+              1121
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.020831,
+            "background_luminance": 0.708148,
+            "luminance_difference": 0.687317,
+            "contrast_ratio": 10.704,
+            "lab_color_difference": 182.143,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 2342,
+            "background_sample_count": 14579,
+            "foreground_fraction": 0.3155,
+            "background_luminance_range_p10_p90": 0.0258,
+            "background_lab_dispersion": 1.414,
+            "local_glare_ratio": 0.0004,
+            "confidence": 0.981,
+            "confidence_factors": {
+              "ocr": 0.995,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.883,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_2_contrast_mrp.jpg",
+            "debug_image_saved": true
+          }
+        }
+      },
+      "lm_r9_002": {
+        "status": "PASS",
+        "reason": "Both declarations meet the implementation-defined engineering contrast threshold (not a statutory threshold)"
+      },
       "ocr_box_measurement": {
         "height_px": 52.0,
         "height_mm": 8.124
@@ -818,6 +1222,212 @@
           348,
           777
         ]
+      },
+      "mrp": {
+        "currency": "INR",
+        "value": 40.0,
+        "inclusive_of_all_taxes": true,
+        "confidence": 0.991,
+        "source_text": "MRP: ₹40.00 Incl. of all taxes",
+        "source_box": [
+          148,
+          1035,
+          846,
+          1093
+        ],
+        "source_image": null,
+        "tokens": [
+          {
+            "text": "MRP",
+            "box": [
+              180,
+              1045,
+              260,
+              1083
+            ]
+          },
+          {
+            "text": ": ₹",
+            "box": [
+              284,
+              1045,
+              324,
+              1083
+            ]
+          },
+          {
+            "text": "40.00",
+            "box": [
+              348,
+              1045,
+              460,
+              1083
+            ]
+          },
+          {
+            "text": "Incl",
+            "box": [
+              492,
+              1045,
+              564,
+              1083
+            ]
+          },
+          {
+            "text": ". ",
+            "box": [
+              572,
+              1045,
+              588,
+              1083
+            ]
+          },
+          {
+            "text": "of",
+            "box": [
+              604,
+              1045,
+              636,
+              1083
+            ]
+          },
+          {
+            "text": "all",
+            "box": [
+              660,
+              1045,
+              700,
+              1083
+            ]
+          },
+          {
+            "text": "taxes",
+            "box": [
+              724,
+              1045,
+              828,
+              1083
+            ]
+          }
+        ]
+      },
+      "contrast_evidence": {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": {
+          "NET_QUANTITY": {
+            "status": "REVIEW",
+            "target": "NET_QUANTITY",
+            "ocr_text": "100 g",
+            "numeric_text": "100",
+            "target_box": [
+              207,
+              746,
+              486,
+              953
+            ],
+            "background_ring_box": [
+              52,
+              591,
+              641,
+              1108
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.000304,
+            "background_luminance": 0.947307,
+            "luminance_difference": 0.947003,
+            "contrast_ratio": 19.826,
+            "lab_color_difference": 249.0,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 12406,
+            "background_sample_count": 209656,
+            "foreground_fraction": 0.2148,
+            "background_luminance_range_p10_p90": 0.0784,
+            "background_lab_dispersion": 3.0,
+            "local_glare_ratio": 0.7699,
+            "confidence": 0.899,
+            "confidence_factors": {
+              "ocr": 0.935,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.644,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 0.3
+            },
+            "issues": [
+              "IMAGE_QUALITY_HIGH_GLARE"
+            ],
+            "debug_image_path": "debug/batch_3_contrast_net_quantity.jpg",
+            "debug_image_saved": true
+          },
+          "MRP": {
+            "status": "REVIEW",
+            "target": "MRP",
+            "ocr_text": "MRP: ₹40.00 Incl. of all taxes",
+            "numeric_text": "40.00",
+            "target_box": [
+              346,
+              1043,
+              462,
+              1085
+            ],
+            "background_ring_box": [
+              314,
+              1011,
+              494,
+              1117
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.013702,
+            "background_luminance": 0.930111,
+            "luminance_difference": 0.916409,
+            "contrast_ratio": 15.386,
+            "lab_color_difference": 218.0,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 1492,
+            "background_sample_count": 8555,
+            "foreground_fraction": 0.3062,
+            "background_luminance_range_p10_p90": 0.051,
+            "background_lab_dispersion": 1.0,
+            "local_glare_ratio": 0.511,
+            "confidence": 0.928,
+            "confidence_factors": {
+              "ocr": 0.991,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.768,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 0.3
+            },
+            "issues": [
+              "IMAGE_QUALITY_HIGH_GLARE"
+            ],
+            "debug_image_path": "debug/batch_3_contrast_mrp.jpg",
+            "debug_image_saved": true
+          }
+        }
+      },
+      "lm_r9_002": {
+        "status": "REVIEW",
+        "reason": "Contrast evidence is not reliable enough for: NET_QUANTITY, MRP"
       },
       "ocr_box_measurement": {
         "height_px": 203.0,
@@ -1202,6 +1812,208 @@
           681
         ]
       },
+      "mrp": {
+        "currency": "INR",
+        "value": 85.0,
+        "inclusive_of_all_taxes": true,
+        "confidence": 0.982,
+        "source_text": "MRP: ₹85.00 Incl. of all taxes",
+        "source_box": [
+          471,
+          1054,
+          959,
+          1095
+        ],
+        "source_image": null,
+        "tokens": [
+          {
+            "text": "MRP",
+            "box": [
+              491,
+              1054,
+              546,
+              1095
+            ]
+          },
+          {
+            "text": ": ₹",
+            "box": [
+              560,
+              1054,
+              588,
+              1095
+            ]
+          },
+          {
+            "text": "85.00",
+            "box": [
+              608,
+              1054,
+              684,
+              1095
+            ]
+          },
+          {
+            "text": "Incl",
+            "box": [
+              705,
+              1054,
+              760,
+              1095
+            ]
+          },
+          {
+            "text": ". ",
+            "box": [
+              767,
+              1054,
+              780,
+              1095
+            ]
+          },
+          {
+            "text": "of",
+            "box": [
+              787,
+              1054,
+              815,
+              1095
+            ]
+          },
+          {
+            "text": "all",
+            "box": [
+              829,
+              1054,
+              863,
+              1095
+            ]
+          },
+          {
+            "text": "taxes",
+            "box": [
+              877,
+              1054,
+              953,
+              1095
+            ]
+          }
+        ]
+      },
+      "contrast_evidence": {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": {
+          "NET_QUANTITY": {
+            "status": "OK",
+            "target": "NET_QUANTITY",
+            "ocr_text": "Net Wt: 500 g",
+            "numeric_text": "500",
+            "target_box": [
+              830,
+              605,
+              904,
+              683
+            ],
+            "background_ring_box": [
+              772,
+              547,
+              962,
+              741
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.315279,
+            "background_luminance": 0.019816,
+            "luminance_difference": 0.295463,
+            "contrast_ratio": 5.232,
+            "lab_color_difference": 122.008,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 131,
+            "background_sample_count": 18689,
+            "foreground_fraction": 0.0227,
+            "background_luminance_range_p10_p90": 0.009,
+            "background_lab_dispersion": 4.0,
+            "local_glare_ratio": 0.0982,
+            "confidence": 0.951,
+            "confidence_factors": {
+              "ocr": 0.967,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.714,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_4_contrast_net_quantity.jpg",
+            "debug_image_saved": true
+          },
+          "MRP": {
+            "status": "OK",
+            "target": "MRP",
+            "ocr_text": "MRP: ₹85.00 Incl. of all taxes",
+            "numeric_text": "85.00",
+            "target_box": [
+              606,
+              1052,
+              686,
+              1097
+            ],
+            "background_ring_box": [
+              572,
+              1018,
+              720,
+              1131
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.887436,
+            "background_luminance": 0.011798,
+            "luminance_difference": 0.875638,
+            "contrast_ratio": 15.169,
+            "lab_color_difference": 217.046,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 1098,
+            "background_sample_count": 7886,
+            "foreground_fraction": 0.305,
+            "background_luminance_range_p10_p90": 0.0067,
+            "background_lab_dispersion": 4.583,
+            "local_glare_ratio": 0.1534,
+            "confidence": 0.947,
+            "confidence_factors": {
+              "ocr": 0.982,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.673,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_4_contrast_mrp.jpg",
+            "debug_image_saved": true
+          }
+        }
+      },
+      "lm_r9_002": {
+        "status": "PASS",
+        "reason": "Both declarations meet the implementation-defined engineering contrast threshold (not a statutory threshold)"
+      },
       "ocr_box_measurement": {
         "height_px": 74.0,
         "height_mm": 11.569
@@ -1511,6 +2323,208 @@
           804
         ]
       },
+      "mrp": {
+        "currency": "INR",
+        "value": 120.0,
+        "inclusive_of_all_taxes": true,
+        "confidence": 0.996,
+        "source_text": "MRP: ₹120.00 Incl. of all taxes",
+        "source_box": [
+          293,
+          916,
+          1000,
+          975
+        ],
+        "source_image": null,
+        "tokens": [
+          {
+            "text": "MRP",
+            "box": [
+              320,
+              916,
+              394,
+              975
+            ]
+          },
+          {
+            "text": ": ₹",
+            "box": [
+              412,
+              916,
+              459,
+              975
+            ]
+          },
+          {
+            "text": "120.00",
+            "box": [
+              477,
+              916,
+              616,
+              975
+            ]
+          },
+          {
+            "text": "Incl",
+            "box": [
+              643,
+              916,
+              717,
+              975
+            ]
+          },
+          {
+            "text": ". ",
+            "box": [
+              726,
+              916,
+              745,
+              975
+            ]
+          },
+          {
+            "text": "of",
+            "box": [
+              763,
+              916,
+              791,
+              975
+            ]
+          },
+          {
+            "text": "all",
+            "box": [
+              819,
+              916,
+              865,
+              975
+            ]
+          },
+          {
+            "text": "taxes",
+            "box": [
+              883,
+              916,
+              994,
+              975
+            ]
+          }
+        ]
+      },
+      "contrast_evidence": {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": {
+          "NET_QUANTITY": {
+            "status": "OK",
+            "target": "NET_QUANTITY",
+            "ocr_text": "Net Wt: 1 kg",
+            "numeric_text": "1",
+            "target_box": [
+              801,
+              617,
+              831,
+              806
+            ],
+            "background_ring_box": [
+              659,
+              475,
+              973,
+              948
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.010032,
+            "background_luminance": 0.774053,
+            "luminance_difference": 0.764021,
+            "contrast_ratio": 13.727,
+            "lab_color_difference": 208.108,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 1791,
+            "background_sample_count": 87152,
+            "foreground_fraction": 0.3159,
+            "background_luminance_range_p10_p90": 0.0352,
+            "background_lab_dispersion": 2.0,
+            "local_glare_ratio": 0.0152,
+            "confidence": 0.971,
+            "confidence_factors": {
+              "ocr": 0.974,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.84,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_5_contrast_net_quantity.jpg",
+            "debug_image_saved": true
+          },
+          "MRP": {
+            "status": "OK",
+            "target": "MRP",
+            "ocr_text": "MRP: ₹120.00 Incl. of all taxes",
+            "numeric_text": "120.00",
+            "target_box": [
+              475,
+              914,
+              618,
+              977
+            ],
+            "background_ring_box": [
+              428,
+              867,
+              665,
+              1024
+            ],
+            "localization_method": "ocr_token_geometry",
+            "localization_confidence": 1.0,
+            "foreground_luminance": 0.007458,
+            "background_luminance": 0.780175,
+            "luminance_difference": 0.772717,
+            "contrast_ratio": 14.448,
+            "lab_color_difference": 215.121,
+            "engineering_interpretation": "STRONG_ENGINEERING_CONTRAST",
+            "engineering_thresholds": {
+              "strong_contrast_ratio": 3.0,
+              "strong_lab_color_difference": 35.0,
+              "low_contrast_ratio": 1.5,
+              "low_lab_color_difference": 12.0,
+              "statutory_threshold": null
+            },
+            "foreground_sample_count": 2631,
+            "background_sample_count": 17191,
+            "foreground_fraction": 0.292,
+            "background_luminance_range_p10_p90": 0.029,
+            "background_lab_dispersion": 2.0,
+            "local_glare_ratio": 0.0262,
+            "confidence": 0.978,
+            "confidence_factors": {
+              "ocr": 0.996,
+              "localization": 1.0,
+              "separation": 1.0,
+              "background_uniformity": 0.857,
+              "sample_size": 1.0,
+              "boundary": 1.0,
+              "image_quality": 1.0
+            },
+            "issues": [],
+            "debug_image_path": "debug/batch_5_contrast_mrp.jpg",
+            "debug_image_saved": true
+          }
+        }
+      },
+      "lm_r9_002": {
+        "status": "PASS",
+        "reason": "Both declarations meet the implementation-defined engineering contrast threshold (not a statutory threshold)"
+      },
       "ocr_box_measurement": null,
       "glyph_measurement": {
         "status": "REVIEW",
@@ -1595,6 +2609,11 @@
       "GOOD": 2,
       "CHECK": 1,
       "REVIEW": 2
+    },
+    "lm_r9_002_status_counts": {
+      "PASS": 4,
+      "FAIL": 0,
+      "REVIEW": 1
     },
     "suspected_outlier_count": 3,
     "readiness": "NEEDS_MORE_MEASUREMENT_WORK",

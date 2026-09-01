@@ -6,6 +6,7 @@ from rules.engine import (
     validate_consumer_care,
     validate_month_year,
     validate_mrp,
+    validate_mrp_netqty_contrast,
     validate_net_quantity,
     validate_unit_scale,
 )
@@ -58,6 +59,52 @@ class RuleEngineTests(unittest.TestCase):
     def test_structured_manufacture_date_passes(self):
         value = {"raw": "February 2022", "normalized": "2022-02", "type": "manufacture_month_year"}
         self.assertEqual(validate_month_year(value)[0], "PASS")
+
+    def test_contrast_rule_passes_only_when_both_targets_are_strong(self):
+        value = {"targets": {
+            "NET_QUANTITY": {"target": "NET_QUANTITY", "status": "OK", "confidence": 0.88,
+                             "contrast_ratio": 4.2, "lab_color_difference": 50.0},
+            "MRP": {"target": "MRP", "status": "OK", "confidence": 0.84,
+                    "contrast_ratio": 3.4, "lab_color_difference": 38.0},
+        }}
+        status, reason = validate_mrp_netqty_contrast(value)
+        self.assertEqual(status, "PASS")
+        self.assertIn("not a statutory threshold", reason)
+        self.assertEqual(
+            evaluate_rule(_rule("mrp_netqty_contrast"), {"mrp_netqty_contrast": value})["status"],
+            "PASS",
+        )
+
+    def test_contrast_rule_fails_confidently_low_target(self):
+        value = {"targets": {
+            "NET_QUANTITY": {"target": "NET_QUANTITY", "status": "OK", "confidence": 0.90,
+                             "contrast_ratio": 1.2, "lab_color_difference": 7.0},
+            "MRP": {"target": "MRP", "status": "OK", "confidence": 0.90,
+                    "contrast_ratio": 4.0, "lab_color_difference": 50.0},
+        }}
+        self.assertEqual(validate_mrp_netqty_contrast(value)[0], "FAIL")
+
+    def test_contrast_rule_reviews_missing_unreliable_or_borderline_evidence(self):
+        self.assertEqual(validate_mrp_netqty_contrast(None)[0], "REVIEW")
+        incomplete = {"targets": {"MRP": {"status": "OK", "confidence": 0.9}}}
+        self.assertEqual(validate_mrp_netqty_contrast(incomplete)[0], "REVIEW")
+        unreliable = {"targets": {
+            "NET_QUANTITY": {"status": "REVIEW", "confidence": 0.4},
+            "MRP": {"status": "OK", "confidence": 0.9},
+        }}
+        self.assertEqual(validate_mrp_netqty_contrast(unreliable)[0], "REVIEW")
+        missing_metrics = {"targets": {
+            "NET_QUANTITY": {"status": "OK", "confidence": 0.9},
+            "MRP": {"status": "OK", "confidence": 0.9},
+        }}
+        self.assertEqual(validate_mrp_netqty_contrast(missing_metrics)[0], "REVIEW")
+        borderline = {"targets": {
+            "NET_QUANTITY": {"status": "OK", "confidence": 0.8,
+                             "contrast_ratio": 2.0, "lab_color_difference": 20.0},
+            "MRP": {"status": "OK", "confidence": 0.8,
+                    "contrast_ratio": 4.0, "lab_color_difference": 40.0},
+        }}
+        self.assertEqual(validate_mrp_netqty_contrast(borderline)[0], "REVIEW")
 
 
 if __name__ == "__main__":

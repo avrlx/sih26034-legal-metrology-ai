@@ -18,6 +18,7 @@ import numpy as np
 import cv2
 
 from cv.aruco import detect_aruco_scale
+from cv.contrast import measure_local_contrast
 from cv.glyph_measurement import measure_net_quantity_numerals
 from cv.measurement import estimate_text_height_mm
 from cv.measurement_confidence import aggregate_measurement_confidence
@@ -32,6 +33,7 @@ from cv.validation import (
     marker_target_distance_ratio,
 )
 from extract_fields import extract_fields
+from rules.engine import validate_mrp_netqty_contrast
 
 
 MARKER_SIZE_MM = 50.0
@@ -53,6 +55,7 @@ CSV_COLUMNS = [
     "pixels_per_mm",
     "net_quantity_value",
     "net_quantity_unit",
+    "mrp_value",
     "source_text",
     "ocr_box_height_px",
     "ocr_box_height_mm",
@@ -67,6 +70,14 @@ CSV_COLUMNS = [
     "calibration_confidence",
     "measurement_confidence",
     "glyph_status",
+    "net_quantity_contrast_ratio",
+    "net_quantity_contrast_confidence",
+    "net_quantity_contrast_status",
+    "mrp_contrast_ratio",
+    "mrp_contrast_confidence",
+    "mrp_contrast_status",
+    "lm_r9_002_status",
+    "lm_r9_002_reason",
     "measurement_quality_flag",
     "suspected_outliers",
     "failure_stage",
@@ -307,6 +318,12 @@ def _empty_result(image_path: str | Path) -> dict[str, Any]:
         "aruco": {"detected": False, "pixels_per_mm": None, "marker_id": None},
         "ocr": {"success": False, "raw_item_count": 0, "filtered_item_count": 0},
         "net_quantity": None,
+        "mrp": None,
+        "contrast_evidence": {"targets": {}},
+        "lm_r9_002": {
+            "status": "REVIEW",
+            "reason": "Contrast measurement was not run",
+        },
         "ocr_box_measurement": None,
         "glyph_measurement": {
             "status": "REVIEW",
@@ -341,6 +358,7 @@ def process_image(
     aruco_detector: Callable[..., dict[str, Any]] = detect_aruco_scale,
     field_extractor: Callable[[list[dict[str, Any]]], dict[str, Any]] = extract_fields,
     glyph_measurer: Callable[..., dict[str, Any]] = measure_net_quantity_numerals,
+    contrast_measurer: Callable[..., dict[str, Any]] = measure_local_contrast,
 ) -> dict[str, Any]:
     """Process one image without allowing its failure to abort the batch."""
     image = str(image_path)
@@ -400,6 +418,7 @@ def process_image(
         try:
             fields = field_extractor(filtered_items)
             extracted_quantity = fields.get("net_quantity")
+            extracted_mrp = fields.get("mrp")
             if isinstance(extracted_quantity, dict):
                 result["net_quantity"] = {
                     key: extracted_quantity.get(key)
@@ -411,9 +430,58 @@ def process_image(
                 }
             else:
                 _record_failure(result, "net_quantity", "Net quantity was not extracted")
+            if isinstance(extracted_mrp, dict):
+                result["mrp"] = {
+                    key: extracted_mrp.get(key)
+                    for key in (
+                        "currency", "value", "inclusive_of_all_taxes", "confidence",
+                        "source_text", "source_box", "source_image", "tokens",
+                    )
+                }
         except Exception as exc:
             extracted_quantity = None
+            extracted_mrp = None
             _record_failure(result, "net_quantity", f"Field extraction failed: {exc}")
+
+        contrast_targets = {}
+        for target_name, evidence in (
+            ("NET_QUANTITY", extracted_quantity),
+            ("MRP", extracted_mrp),
+        ):
+            try:
+                contrast_debug_path = None
+                if debug_path is not None:
+                    base = Path(debug_path)
+                    contrast_debug_path = base.with_name(
+                        base.stem.replace("_glyph", "")
+                        + f"_contrast_{target_name.lower()}{base.suffix or '.jpg'}"
+                    )
+                contrast_targets[target_name] = contrast_measurer(
+                    image,
+                    evidence,
+                    target_name,
+                    image_quality=result.get("image_quality"),
+                    debug_image_path=contrast_debug_path,
+                )
+            except Exception as exc:
+                contrast_targets[target_name] = {
+                    "status": "REVIEW",
+                    "target": target_name,
+                    "confidence": 0.0,
+                    "issues": [f"Contrast measurement failed: {exc}"],
+                }
+        result["contrast_evidence"] = {
+            "method": "local_relative_luminance_and_lab_color_difference",
+            "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+            "targets": contrast_targets,
+        }
+        contrast_status, contrast_reason = validate_mrp_netqty_contrast(
+            result["contrast_evidence"]
+        )
+        result["lm_r9_002"] = {
+            "status": contrast_status,
+            "reason": contrast_reason,
+        }
 
         pixels_per_mm = result["aruco"].get("pixels_per_mm")
         if isinstance(extracted_quantity, dict):
@@ -706,6 +774,10 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
             flag: sum(item.get("measurement_quality_flag") == flag for item in results)
             for flag in ("GOOD", "CHECK", "REVIEW")
         },
+        "lm_r9_002_status_counts": {
+            status: sum((item.get("lm_r9_002") or {}).get("status") == status for item in results)
+            for status in ("PASS", "FAIL", "REVIEW")
+        },
         "suspected_outlier_count": sum(
             bool(item.get("suspected_outliers")) for item in results
         ),
@@ -727,8 +799,13 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
     quality = result.get("image_quality") or {}
     aruco = result.get("aruco") or {}
     quantity = result.get("net_quantity") or {}
+    mrp = result.get("mrp") or {}
     box = result.get("ocr_box_measurement") or {}
     glyph = result.get("glyph_measurement") or {}
+    contrast_targets = (result.get("contrast_evidence") or {}).get("targets") or {}
+    quantity_contrast = contrast_targets.get("NET_QUANTITY") or {}
+    mrp_contrast = contrast_targets.get("MRP") or {}
+    contrast_rule = result.get("lm_r9_002") or {}
     return {
         "image": result.get("image"),
         "usable": quality.get("usable"),
@@ -739,6 +816,7 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
         "pixels_per_mm": aruco.get("pixels_per_mm"),
         "net_quantity_value": quantity.get("value"),
         "net_quantity_unit": quantity.get("unit"),
+        "mrp_value": mrp.get("value"),
         "source_text": quantity.get("source_text"),
         "ocr_box_height_px": box.get("height_px"),
         "ocr_box_height_mm": box.get("height_mm"),
@@ -753,6 +831,14 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
         "calibration_confidence": glyph.get("calibration_confidence"),
         "measurement_confidence": glyph.get("measurement_confidence"),
         "glyph_status": glyph.get("status"),
+        "net_quantity_contrast_ratio": quantity_contrast.get("contrast_ratio"),
+        "net_quantity_contrast_confidence": quantity_contrast.get("confidence"),
+        "net_quantity_contrast_status": quantity_contrast.get("status"),
+        "mrp_contrast_ratio": mrp_contrast.get("contrast_ratio"),
+        "mrp_contrast_confidence": mrp_contrast.get("confidence"),
+        "mrp_contrast_status": mrp_contrast.get("status"),
+        "lm_r9_002_status": contrast_rule.get("status"),
+        "lm_r9_002_reason": contrast_rule.get("reason"),
         "measurement_quality_flag": result.get("measurement_quality_flag"),
         "suspected_outliers": " | ".join(result.get("suspected_outliers") or []),
         "failure_stage": result.get("failure_stage"),
@@ -834,7 +920,11 @@ def save_reports(
     comparison = build_before_after_comparison(before_results, results)
     report = make_json_safe({
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "purpose": "Engineering validation only; not Rule 7 legal compliance",
+        "purpose": (
+            "LM-R9-002 prototype contrast evidence using implementation-defined "
+            "engineering thresholds; not a statutory numeric threshold. "
+            "LM-R7-001 remains REVIEW."
+        ),
         "marker_size_mm": MARKER_SIZE_MM,
         "results": results,
         "summary": summary,
@@ -862,7 +952,7 @@ def save_reports(
 
 
 def print_summary_table(results: list[dict[str, Any]]) -> None:
-    print("IMAGE | QUANTITY | ARUCO | GLYPH MM | CONFIDENCE | STATUS")
+    print("IMAGE | QUANTITY | ARUCO | GLYPH MM | CONFIDENCE | LM-R9-002 | STATUS")
     for result in results:
         quantity = result.get("net_quantity") or {}
         quantity_text = (
@@ -880,7 +970,9 @@ def print_summary_table(results: list[dict[str, Any]]) -> None:
         )
         print(
             f"{Path(result['image']).name} | {quantity_text} | {aruco_text} | "
-            f"{height_text} | {confidence_text} | {result['measurement_quality_flag']}"
+            f"{height_text} | {confidence_text} | "
+            f"{(result.get('lm_r9_002') or {}).get('status', 'REVIEW')} | "
+            f"{result['measurement_quality_flag']}"
         )
 
 

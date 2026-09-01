@@ -7,6 +7,7 @@ environment with PaddleOCR installed to exercise the full image pipeline.
 import json
 
 from cv.aruco import detect_aruco_scale
+from cv.contrast import measure_local_contrast
 from cv.glyph_measurement import measure_net_quantity_numerals
 from cv.measurement import estimate_text_height_mm
 from cv.ocr_filter import filter_ocr_items_near_aruco
@@ -77,6 +78,22 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
             debug=True,
         )
         net_qty["glyph_measurement"] = glyph_measurement
+
+    contrast_targets = {
+        target: measure_local_contrast(
+            image_path,
+            fields.get(field_name),
+            target,
+            image_quality=quality,
+            debug_image_path=f"debug/{target.lower()}_contrast.jpg",
+        )
+        for target, field_name in (("NET_QUANTITY", "net_quantity"), ("MRP", "mrp"))
+    }
+    fields["mrp_netqty_contrast"] = {
+        "method": "local_relative_luminance_and_lab_color_difference",
+        "threshold_basis": "implementation-defined engineering thresholds; not statutory",
+        "targets": contrast_targets,
+    }
 
     print("\n========== NET QUANTITY MEASUREMENT ==========\n")
     if measurement:

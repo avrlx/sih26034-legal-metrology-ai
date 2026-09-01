@@ -40,6 +40,7 @@ def get_nested_value(data, field_name):
         "mrp": data.get("mrp"),
         "consumer_care": data.get("consumer_care"),
         "country_of_origin": data.get("country_of_origin"),
+        "mrp_netqty_contrast": data.get("mrp_netqty_contrast"),
     }
 
     return mapping.get(field_name)
@@ -172,6 +173,86 @@ def validate_month_year(value):
         return "FAIL", f"Detected month/year has unrecognized format: {value}"
 
     return "PASS", f"Manufacture date detected: {value}"
+
+
+def validate_mrp_netqty_contrast(value):
+    """Evaluate deterministic prototype contrast evidence for both declarations.
+
+    These cut-offs are implementation-defined engineering thresholds. They are
+    not represented as statutory Legal Metrology thresholds.
+    """
+    if not isinstance(value, dict):
+        return "REVIEW", "MRP/net-quantity contrast evidence is unavailable"
+
+    targets = value.get("targets")
+    if not isinstance(targets, dict):
+        return "REVIEW", "Contrast evidence does not contain target measurements"
+
+    required = ("NET_QUANTITY", "MRP")
+    missing = [name for name in required if not isinstance(targets.get(name), dict)]
+    if missing:
+        return "REVIEW", f"Contrast evidence is missing: {', '.join(missing)}"
+
+    measurements = [targets[name] for name in required]
+    unreliable = [
+        measurement.get("target", name)
+        for name, measurement in zip(required, measurements)
+        if measurement.get("status") != "OK"
+        or not isinstance(measurement.get("confidence"), (int, float))
+        or measurement["confidence"] < 0.65
+    ]
+    if unreliable:
+        return (
+            "REVIEW",
+            "Contrast evidence is not reliable enough for: " + ", ".join(unreliable),
+        )
+
+    missing_metrics = [
+        measurement.get("target", name)
+        for name, measurement in zip(required, measurements)
+        if not isinstance(measurement.get("contrast_ratio"), (int, float))
+        or not isinstance(measurement.get("lab_color_difference"), (int, float))
+    ]
+    if missing_metrics:
+        return (
+            "REVIEW",
+            "Contrast metrics are incomplete for: " + ", ".join(missing_metrics),
+        )
+
+    strong = [
+        measurement["contrast_ratio"] >= 3.0
+        or measurement["lab_color_difference"] >= 35.0
+        for measurement in measurements
+    ]
+    low = [
+        measurement["contrast_ratio"] < 1.5
+        and measurement["lab_color_difference"] < 12.0
+        and measurement.get("confidence", 0) >= 0.75
+        for measurement in measurements
+    ]
+    if all(strong):
+        return (
+            "PASS",
+            "Both declarations meet the implementation-defined engineering "
+            "contrast threshold (not a statutory threshold)",
+        )
+    if any(low):
+        failed = [
+            measurement.get("target", required[index])
+            for index, measurement in enumerate(measurements)
+            if low[index]
+        ]
+        return (
+            "FAIL",
+            "Low contrast detected for " + ", ".join(failed)
+            + " under implementation-defined engineering thresholds "
+            "(not statutory thresholds)",
+        )
+    return (
+        "REVIEW",
+        "Contrast is borderline under implementation-defined engineering "
+        "thresholds; human review is required",
+    )
 
 def evaluate_small_package_exemption(value):
     if not isinstance(value, dict):
@@ -313,6 +394,8 @@ def evaluate_rule(rule, fields):
         "reason": reason,
         "value": fields.get("net_quantity")
         }
+    elif field_name == "mrp_netqty_contrast":
+        status, reason = validate_mrp_netqty_contrast(value)
     else:
         return {
             "status": "REVIEW",
