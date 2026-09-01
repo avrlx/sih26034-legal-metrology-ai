@@ -11,6 +11,24 @@ __pycache__/
 .paddlex/
 .paddleocr/
 
+# Generated analysis and diagnostic artifacts (kept locally)
+debug/
+results/
+
 # temporary outputs
 output/
 outputs/
+
+# Local validation datasets; retain only the directory placeholder
+validation/contrast/images/*
+!validation/contrast/images/.gitkeep
+
+# Ad-hoc package photos; retain the canonical runnable examples below
+samples/*
+!samples/1.jpg
+!samples/2.jpg
+!samples/3.jpg
+!samples/4.jpg
+!samples/5.jpg
+!samples/best.jpg
+!samples/BestToTest.jpg

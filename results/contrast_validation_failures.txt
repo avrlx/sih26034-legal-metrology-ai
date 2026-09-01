@@ -1,4 +1,0 @@
-Contrast validation failure analysis
-Engineering validation only; not a legal determination
-
-No incorrect classifications are available for analysis.

@@ -1,1 +1,0 @@
-annotation_id,image,target_type,target_text,human_label,expected_system_status,system_status,correct,contrast_ratio,lab_difference,confidence,ocr_confidence,localization_confidence,background_uniformity,global_glare_ratio,local_glare_ratio,issues,localization_method,probable_failure_cause,annotation_notes
