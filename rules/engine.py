@@ -254,6 +254,33 @@ def validate_mrp_netqty_contrast(value):
         "thresholds; human review is required",
     )
 
+
+def validate_contrast_target(value, target_name=None):
+    """Classify one contrast measurement using prototype engineering cut-offs."""
+    name = target_name or (value.get("target") if isinstance(value, dict) else None) or "target"
+    if not isinstance(value, dict):
+        return "REVIEW", f"Contrast evidence is unavailable for {name}"
+    confidence = value.get("confidence")
+    if value.get("status") != "OK" or not isinstance(confidence, (int, float)) or confidence < 0.65:
+        return "REVIEW", f"Contrast evidence is not reliable enough for {name}"
+    ratio = value.get("contrast_ratio")
+    color_difference = value.get("lab_color_difference")
+    if not isinstance(ratio, (int, float)) or not isinstance(color_difference, (int, float)):
+        return "REVIEW", f"Contrast metrics are incomplete for {name}"
+    if ratio >= 3.0 or color_difference >= 35.0:
+        return (
+            "PASS",
+            f"{name} meets an implementation-defined engineering contrast threshold "
+            "(not a statutory threshold)",
+        )
+    if ratio < 1.5 and color_difference < 12.0 and confidence >= 0.75:
+        return (
+            "FAIL",
+            f"{name} is below implementation-defined engineering contrast thresholds "
+            "(not statutory thresholds)",
+        )
+    return "REVIEW", f"{name} contrast is borderline; human review is required"
+
 def evaluate_small_package_exemption(value):
     if not isinstance(value, dict):
         return (

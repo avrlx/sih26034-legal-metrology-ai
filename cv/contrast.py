@@ -83,6 +83,16 @@ def localize_contrast_value_region(
     """Locate an extracted numeric value using word boxes before text fallback."""
     if not isinstance(evidence, dict):
         return None
+    manual_bounds = _bounds(evidence.get("manual_target_polygon"))
+    if manual_bounds is not None:
+        box = _clamp_box(manual_bounds, image_width, image_height, padding=2)
+        if box:
+            return {
+                "box": list(box),
+                "method": "manually_confirmed_polygon",
+                "confidence": 1.0,
+                "numeric_text": str(evidence.get("source_text") or ""),
+            }
     expected_value = evidence.get("value")
     for token in evidence.get("tokens") or []:
         if not isinstance(token, dict):

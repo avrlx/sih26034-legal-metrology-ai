@@ -86,6 +86,13 @@ class ContrastMeasurementTests(unittest.TestCase):
         self.assertEqual(result["status"], "REVIEW")
         self.assertIn("BACKGROUND_RING_CLIPPED_AT_IMAGE_BOUNDARY", result["issues"])
 
+    def test_manually_confirmed_polygon_is_supported_as_fallback(self):
+        image, evidence = _text_fixture((0, 0, 0), (230, 230, 230))
+        evidence["manual_target_polygon"] = evidence["source_box"]
+        evidence["tokens"] = []
+        result = measure_local_contrast(image, evidence, "MRP")
+        self.assertEqual(result["localization_method"], "manually_confirmed_polygon")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,10 @@
+human_label,metric,count,min,max,median,mean
+CLEAR_CONTRAST,contrast_ratio,0,,,,
+CLEAR_CONTRAST,lab_difference,0,,,,
+CLEAR_CONTRAST,confidence,0,,,,
+LOW_CONTRAST,contrast_ratio,0,,,,
+LOW_CONTRAST,lab_difference,0,,,,
+LOW_CONTRAST,confidence,0,,,,
+UNCERTAIN,contrast_ratio,0,,,,
+UNCERTAIN,lab_difference,0,,,,
+UNCERTAIN,confidence,0,,,,
