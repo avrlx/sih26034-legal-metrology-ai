@@ -79,3 +79,10 @@ export async function analyzePackage(file: File): Promise<CanonicalReport> {
   }
   return body;
 }
+
+export async function loadDemoSample(path: string, filename: string): Promise<File> {
+  const response = await fetch(path, { method: "GET" });
+  if (!response.ok) throw new ApiError("The demo image could not be loaded.", response.status);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type || "image/jpeg" });
+}

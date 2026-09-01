@@ -13,16 +13,20 @@ import {
   ShieldCheck,
   TriangleAlert,
   XCircle,
+  Download,
 } from "lucide-react";
 
+import { EvidenceGallery } from "@/components/evidence-gallery";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { downloadReport } from "@/lib/report-export";
 import type {
   CanonicalReport,
+  EvidenceImage,
   ExtractedField,
   JsonValue,
   ReportStatus,
@@ -107,7 +111,7 @@ function SummaryHeader({ report }: { report: CanonicalReport }) {
   );
 }
 
-function DeclarationCard({ entry }: { entry: ExtractedField }) {
+function DeclarationCard({ entry, images }: { entry: ExtractedField; images: EvidenceImage[] }) {
   const certainty = confidence(entry.extraction_confidence ?? entry.ocr_confidence);
   return (
     <div className={`rounded-lg border p-4 ${entry.present ? "border-slate-200 bg-white" : "border-dashed border-slate-200 bg-slate-50/70"}`}>
@@ -124,6 +128,7 @@ function DeclarationCard({ entry }: { entry: ExtractedField }) {
           {entry.raw_text && <p className="mt-1 line-clamp-3">Source: {entry.raw_text}</p>}
         </div>
       )}
+      <div className="mt-3"><EvidenceGallery images={images} /></div>
     </div>
   );
 }
@@ -141,7 +146,13 @@ function Declarations({ report }: { report: CanonicalReport }) {
         </div>
       </CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-2">
-        {Object.values(report.extracted_fields).map((entry) => <DeclarationCard key={entry.field_name} entry={entry} />)}
+        {Object.values(report.extracted_fields).map((entry) => (
+          <DeclarationCard
+            key={entry.field_name}
+            entry={entry}
+            images={(report.evidence_images ?? []).filter((image) => image.related_declaration === entry.field_name)}
+          />
+        ))}
       </CardContent>
     </Card>
   );
@@ -262,7 +273,7 @@ function EvidenceDetails({ item }: { item: RuleEvidence }) {
   );
 }
 
-function RuleCard({ rule }: { rule: RuleResult }) {
+function RuleCard({ rule, images }: { rule: RuleResult; images: EvidenceImage[] }) {
   const presentation = statusPresentation[rule.status];
   return (
     <AccordionItem value={rule.rule_id} className={`rounded-xl border ${presentation.panel} bg-white px-4 shadow-sm sm:px-5`}>
@@ -290,6 +301,7 @@ function RuleCard({ rule }: { rule: RuleResult }) {
             <div className="flex flex-wrap gap-2">
               {rule.reason_codes.map((code) => <Badge key={code} variant="outline" className="bg-slate-50 font-mono text-[10px] text-slate-600">{code}</Badge>)}
             </div>
+            <EvidenceGallery images={images} label="Rule evidence" />
           </div>
           <div className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Evidence references</p>
@@ -314,7 +326,13 @@ function RuleResults({ report }: { report: CanonicalReport }) {
         <p className="text-xs text-slate-500">{report.rule_results.length} rules</p>
       </div>
       <Accordion className="gap-3">
-        {report.rule_results.map((rule) => <RuleCard key={rule.rule_id} rule={rule} />)}
+        {report.rule_results.map((rule) => (
+          <RuleCard
+            key={rule.rule_id}
+            rule={rule}
+            images={(report.evidence_images ?? []).filter((image) => image.related_rule_id === rule.rule_id)}
+          />
+        ))}
       </Accordion>
     </section>
   );
@@ -404,7 +422,11 @@ export function ReportDashboard({ report, onReset }: { report: CanonicalReport; 
               <p className="mt-1 text-xs leading-5 text-sky-200">{report.image.filename} · {report.rule_results.length} rules · processed {report.image.processing_timestamp ? new Date(report.image.processing_timestamp).toLocaleString() : "timestamp unavailable"}</p>
             </div>
           </div>
-          <Button variant="outline" className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={onReset}><RotateCcw /> Analyze another image</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => downloadReport(report, "json")}><Download /> Export JSON</Button>
+            <Button variant="outline" className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => downloadReport(report, "md")}><Download /> Export Markdown</Button>
+            <Button variant="outline" className="border-white/25 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={onReset}><RotateCcw /> Analyze another image</Button>
+          </div>
         </CardContent>
       </Card>
 

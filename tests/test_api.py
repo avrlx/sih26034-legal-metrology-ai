@@ -42,15 +42,20 @@ def _png_bytes():
 
 
 class FakeAnalyzer:
-    def __init__(self, report=None, error=None):
+    def __init__(self, report=None, error=None, write_artifact=False):
         self.report = report or _canonical_report()
         self.error = error
         self.paths = []
         self.display_filenames = []
+        self.write_artifact = write_artifact
 
     def analyze_package(self, image_path, *, display_filename):
         self.paths.append(Path(image_path))
         self.display_filenames.append(display_filename)
+        if self.write_artifact:
+            evidence = Path(image_path).parent / "evidence"
+            evidence.mkdir()
+            (evidence / "overlay.jpg").write_bytes(b"request-local")
         if self.error:
             raise self.error
         return self.report
@@ -148,6 +153,23 @@ class FastAPITests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(analyzer.paths)
+
+    def test_sequential_requests_are_isolated_and_all_artifacts_are_cleaned(self):
+        report = _canonical_report()
+        report["evidence_images"] = [{
+            "id": "safe", "type": "DECLARATION_CROP", "label": "MRP",
+            "mime_type": "image/jpeg", "data_url": "data:image/jpeg;base64,YQ==",
+        }]
+        analyzer = FakeAnalyzer(report, write_artifact=True)
+        client = TestClient(create_app(analyzer))
+        first = client.post("/analyze", files={"file": ("one.png", _png_bytes(), "image/png")})
+        second = client.post("/analyze", files={"file": ("two.png", _png_bytes(), "image/png")})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertNotEqual(analyzer.paths[0].parent, analyzer.paths[1].parent)
+        self.assertTrue(all(not path.parent.exists() for path in analyzer.paths))
+        self.assertNotIn("sih26034_upload_", first.text)
+        self.assertEqual(first.json()["evidence_images"][0]["data_url"], "data:image/jpeg;base64,YQ==")
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ReportDashboard } from "@/components/report-dashboard";
-import { analyzePackage, checkHealth } from "@/services/api";
+import { analyzePackage, checkHealth, loadDemoSample } from "@/services/api";
 import type { CanonicalReport } from "@/types/report";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -68,11 +68,13 @@ function UploadPanel({
   onFile,
   onAnalyze,
   error,
+  onDemo,
 }: {
   selectedFile: File | null;
   onFile: (file: File) => void;
   onAnalyze: () => void;
   error: string | null;
+  onDemo: (path: string, filename: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -150,6 +152,14 @@ function UploadPanel({
           >
             <ShieldCheck /> Analyze package
           </Button>
+        </div>
+        <div className="rounded-lg border border-sky-100 bg-sky-50/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-sky-900">Try a real sample</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">Each sample is sent through the same POST /analyze pipeline as an upload.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => onDemo("/demo-samples/standard-package.jpg", "standard-package.jpg")}>Standard package example</Button>
+            <Button type="button" variant="outline" onClick={() => onDemo("/demo-samples/high-glare-package.jpg", "high-glare-package.jpg")}>High-glare example</Button>
+          </div>
         </div>
         {error && (
           <Alert variant="destructive">
@@ -235,6 +245,15 @@ export function AnalysisWorkspace() {
     }
   };
 
+  const selectDemo = async (path: string, filename: string) => {
+    setRequestError(null);
+    try {
+      selectFile(await loadDemoSample(path, filename));
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : "The demo image could not be loaded.");
+    }
+  };
+
   const reset = () => {
     setSelectedFile(null);
     setValidationError(null);
@@ -280,7 +299,7 @@ export function AnalysisWorkspace() {
         ) : report ? (
           <ReportDashboard report={report} onReset={reset} />
         ) : (
-          <UploadPanel selectedFile={selectedFile} onFile={selectFile} onAnalyze={analyze} error={validationError} />
+          <UploadPanel selectedFile={selectedFile} onFile={selectFile} onAnalyze={analyze} onDemo={selectDemo} error={validationError} />
         )}
       </main>
 

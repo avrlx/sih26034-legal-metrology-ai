@@ -3,21 +3,24 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AnalysisWorkspace } from "@/components/analysis-workspace";
-import { analyzePackage, checkHealth } from "@/services/api";
+import { analyzePackage, checkHealth, loadDemoSample } from "@/services/api";
 import { reportFixture } from "@/test/report-fixture";
 
 vi.mock("@/services/api", () => ({
   analyzePackage: vi.fn(),
   checkHealth: vi.fn(),
+  loadDemoSample: vi.fn(),
 }));
 
 const mockedAnalyze = vi.mocked(analyzePackage);
 const mockedHealth = vi.mocked(checkHealth);
+const mockedDemo = vi.mocked(loadDemoSample);
 
 describe("AnalysisWorkspace", () => {
   beforeEach(() => {
     mockedHealth.mockResolvedValue({ status: "ok", service: "PackSure" });
     mockedAnalyze.mockResolvedValue(reportFixture());
+    mockedDemo.mockResolvedValue(new File(["demo"], "standard-package.jpg", { type: "image/jpeg" }));
   });
 
   it("accepts a supported file selection and shows its metadata", async () => {
@@ -88,6 +91,7 @@ describe("AnalysisWorkspace", () => {
     report.quality = {};
     report.ocr = {};
     report.evidence = {};
+    report.evidence_images = undefined;
     mockedAnalyze.mockResolvedValue(report);
     render(<AnalysisWorkspace />);
     await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "package.jpg", { type: "image/jpeg" }));
@@ -96,5 +100,14 @@ describe("AnalysisWorkspace", () => {
     expect(await screen.findByText("Overall compliance status")).toBeInTheDocument();
     expect(screen.getByText("No OCR evidence was returned.")).toBeInTheDocument();
     expect(screen.getByText("No contrast evidence was returned.")).toBeInTheDocument();
+  });
+
+  it("loads a demo image and submits it through the real analysis function", async () => {
+    const user = userEvent.setup();
+    render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Standard package example" }));
+    expect(mockedDemo).toHaveBeenCalledWith("/demo-samples/standard-package.jpg", "standard-package.jpg");
+    await user.click(screen.getByRole("button", { name: /analyze package/i }));
+    expect(mockedAnalyze).toHaveBeenCalledWith(expect.objectContaining({ name: "standard-package.jpg" }));
   });
 });

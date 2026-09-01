@@ -154,6 +154,16 @@ export interface ProcessingWarning {
   message: string;
 }
 
+export interface EvidenceImage {
+  id: string;
+  type: "DECLARATION_CROP" | "NUMERAL_HEIGHT_OVERLAY" | "CONTRAST_OVERLAY" | string;
+  label: string;
+  mime_type: "image/jpeg" | "image/png" | string;
+  data_url: string;
+  related_declaration?: string;
+  related_rule_id?: string;
+}
+
 export interface CanonicalReport {
   report_version: string;
   disclaimer: string;
@@ -169,6 +179,7 @@ export interface CanonicalReport {
     calibration?: CalibrationEvidence;
   };
   warnings: ProcessingWarning[];
+  evidence_images?: EvidenceImage[];
 }
 
 export interface HealthResponse {

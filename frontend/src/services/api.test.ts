@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { analyzePackage, checkHealth } from "@/services/api";
+import { analyzePackage, checkHealth, loadDemoSample } from "@/services/api";
 import { reportFixture } from "@/test/report-fixture";
 
 describe("API service", () => {
@@ -37,5 +37,13 @@ describe("API service", () => {
   it("maps backend errors to safe user-facing messages", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("/private/server/traceback", { status: 500 })));
     await expect(analyzePackage(new File(["x"], "package.png", { type: "image/png" }))).rejects.toThrow("Analysis could not be completed");
+  });
+
+  it("loads a local demo asset as a File for the normal analyze flow", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("image", { status: 200, headers: { "Content-Type": "image/jpeg" } })));
+    const file = await loadDemoSample("/demo-samples/standard-package.jpg", "standard-package.jpg");
+    expect(file).toBeInstanceOf(File);
+    expect(file.name).toBe("standard-package.jpg");
+    expect(file.type).toBe("image/jpeg");
   });
 });

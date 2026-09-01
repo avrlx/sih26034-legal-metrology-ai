@@ -104,5 +104,14 @@ export function reportFixture(): CanonicalReport {
       calibration: { detected: true, pixels_per_mm: 6.4013 },
     },
     warnings: [],
+    evidence_images: [{
+      id: "numeral-height-overlay",
+      type: "NUMERAL_HEIGHT_OVERLAY",
+      label: "Numeral height measurement overlay",
+      mime_type: "image/jpeg",
+      data_url: "data:image/jpeg;base64,YQ==",
+      related_declaration: "product",
+      related_rule_id: "LM-R7-001",
+    }],
   };
 }

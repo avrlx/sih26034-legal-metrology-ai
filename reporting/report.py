@@ -27,6 +27,7 @@ EVIDENCE_KEYS = {
     "source_layout", "label_text", "label_box", "source_lines", "method",
     "issues",
 }
+PRIVATE_PATH_KEYS = {"debug_image_path", "debug_overlay_path", "debug_image_saved"}
 
 
 def _json_safe(value: Any) -> Any:
@@ -35,9 +36,13 @@ def _json_safe(value: Any) -> Any:
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, Path):
-        return str(value)
+        return value.name
     if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
+        return {
+            str(key): _json_safe(item)
+            for key, item in value.items()
+            if str(key) not in PRIVATE_PATH_KEYS
+        }
     if isinstance(value, (list, tuple, set)):
         return [_json_safe(item) for item in value]
     if hasattr(value, "item"):
@@ -252,7 +257,6 @@ def _contrast_evidence(batch_result: dict[str, Any]) -> list[dict[str, Any]]:
             "background_luminance": item.get("background_luminance"),
             "confidence": item.get("confidence"),
             "issues": item.get("issues") or [],
-            "debug_overlay_path": item.get("debug_image_path"),
             "threshold_basis": "implementation-defined engineering thresholds; not statutory",
         })
     return evidence
@@ -269,7 +273,6 @@ def _measurement_evidence(batch_result: dict[str, Any]) -> dict[str, Any]:
         "confidence": glyph.get("measurement_confidence", glyph.get("confidence")),
         "calibration_detected": bool(aruco.get("detected")),
         "pixels_per_mm": aruco.get("pixels_per_mm"),
-        "debug_overlay_path": glyph.get("debug_image_path"),
         "validation_status": batch_result.get("validation_status"),
         "unresolved_reason": (
             "Physical numeral-height measurement has not been independently validated"
@@ -436,7 +439,7 @@ def build_package_report(
         "disclaimer": DISCLAIMER,
         "image": {
             "filename": image_path.name,
-            "path": str(image_path),
+            "path": image_path.name,
             "width": quality.get("width"),
             "height": quality.get("height"),
             "processing_timestamp": processing_timestamp or datetime.now(timezone.utc).isoformat(),
@@ -464,6 +467,7 @@ def build_package_report(
             "calibration": _json_safe(batch_result.get("aruco") or {}),
         },
         "warnings": warnings,
+        "evidence_images": _json_safe(batch_result.get("evidence_images") or []),
     }
     return _json_safe(report)
 

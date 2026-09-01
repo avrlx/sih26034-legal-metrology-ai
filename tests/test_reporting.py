@@ -81,7 +81,7 @@ class ReportingTests(unittest.TestCase):
         report = build_package_report(_batch_result(), processing_timestamp="2026-01-01T00:00:00Z")
         self.assertEqual(report["report_version"], "1.0")
         for key in ("image", "quality", "ocr", "extracted_fields", "rule_results",
-                    "summary", "evidence", "warnings"):
+                    "summary", "evidence", "warnings", "evidence_images"):
             self.assertIn(key, report)
         self.assertEqual(report["image"]["processing_timestamp"], "2026-01-01T00:00:00Z")
         self.assertEqual(report["ocr"]["evidence"][-1]["source_image"], "upload.png")
@@ -140,7 +140,19 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(rule["status"], "PASS")
         self.assertEqual(len(rule["evidence"]), 2)
         self.assertEqual(rule["reason_codes"], ["CONTRAST_CLEAR"])
-        self.assertIn("debug_overlay_path", rule["evidence"][0])
+        self.assertNotIn("debug_overlay_path", rule["evidence"][0])
+        self.assertNotIn("debug_overlay_path", report["evidence"]["numeral_height"])
+
+    def test_embedded_evidence_is_preserved_without_local_debug_paths(self):
+        batch = _batch_result()
+        batch["evidence_images"] = [{
+            "id": "declaration-mrp", "type": "DECLARATION_CROP",
+            "label": "MRP location", "mime_type": "image/jpeg",
+            "data_url": "data:image/jpeg;base64,YQ==", "related_declaration": "mrp",
+        }]
+        report = build_package_report(batch)
+        self.assertEqual(report["evidence_images"], batch["evidence_images"])
+        self.assertNotIn("debug/", json.dumps(report))
 
     def test_json_serialization_and_markdown_generation(self):
         report = build_package_report(_batch_result())

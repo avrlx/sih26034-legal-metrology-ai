@@ -83,7 +83,7 @@ curl -X POST \
   http://127.0.0.1:8000/analyze
 ```
 
-Uploads use request-isolated temporary storage and are deleted after processing. The service does not persist uploaded files, reports, OCR text, or debug images.
+Uploads and intermediate overlays use request-isolated temporary storage and are deleted after processing. The service does not persist uploaded files, reports, OCR text, or debug images. Visual evidence is returned as bounded JPEG data URLs in the canonical report; local debug paths are never exposed.
 
 ## Dashboard behavior
 
@@ -92,6 +92,10 @@ The frontend provides three states:
 1. Upload with drag-and-drop, browse, filename, size, and format validation.
 2. A non-streaming pipeline visualization while the single `POST /analyze` request runs.
 3. A responsive compliance dashboard showing summary counts, declarations, all rule results, OCR evidence, image quality, warnings, contrast evidence, and numeral-height evidence.
+
+Relevant declaration and rule cards expose a **View evidence** action for request-generated declaration crops, LM-R7 numeral-height overlays, and LM-R9 contrast overlays. Cards without visual evidence do not show an empty action. Reports can be downloaded as canonical JSON or a presentation-only Markdown summary.
+
+Two bundled demo selectors use `samples/1.jpg` and `samples/3.jpg`. Selecting one loads the actual image file and sends it through the same `POST /analyze` request as a user upload; no report response is hardcoded in the frontend.
 
 `REVIEW` is treated as a valid report outcome. LM-R7 measurement uncertainty and LM-R9 contrast or glare evidence are displayed from backend reason codes and evidence; those calculations are never reimplemented in TypeScript.
 
@@ -120,6 +124,26 @@ Generate local JSON and Markdown reports for `samples/1.jpg` through `samples/5.
 
 Generated reports are written to the ignored `results/reports/` directory.
 
+## Validation benchmark
+
+The manual annotation template is at `validation/ground_truth.csv`. Add 20–50 independently reviewed images and follow `validation/README.md`; blank and `UNKNOWN` labels are excluded from denominators and are never guessed.
+
+Run:
+
+```bash
+.venv/bin/python benchmark_validation.py
+```
+
+The benchmark reuses `PackageAnalyzer` and writes ignored JSON, CSV, and Markdown summaries under `results/validation/`. It reports exact and normalized extraction accuracy, per-rule decisions, PASS/FAIL precision, review rate, confusion transitions, quality-category slices, and false passes. An empty template produces explicit null/not-evaluated metrics rather than fabricated accuracy.
+
+## Evidence safety and limits
+
+- Visual evidence is derived only from the current request image and the pipeline's generated request-local overlays.
+- Overlay paths must resolve under the request's evidence directory; arbitrary files are rejected.
+- Images are resized and JPEG-encoded with per-image and total payload limits before embedding.
+- Temporary uploads and overlays are removed when the request ends. The browser receives no filesystem locations or reusable evidence identifiers.
+- Embedded evidence increases response size; this prototype caps raw evidence at 768 KiB per image and 2 MiB per report.
+
 ## Known limitations
 
 - This is a local prototype with no authentication, database, scan history, admin functions, or PDF export.
@@ -127,5 +151,5 @@ Generated reports are written to the ignored `results/reports/` directory.
 - Analysis is synchronous from the browser's perspective; pipeline stages are a UI representation, not server-sent progress.
 - Physical numeral-height evidence remains `REVIEW` until independently validated.
 - LM-R9 contrast thresholds are implementation-defined engineering thresholds, not statutory thresholds.
-- The canonical report may contain internal debug-overlay paths when reports are generated locally. The frontend deliberately never renders those paths. Safe evidence-image delivery needs a dedicated public API representation or endpoint.
+- Evidence images are embedded in JSON for safe local-prototype delivery; a production service should use authenticated, expiring object storage if payload scale requires separate assets.
 - Frontend validation reflects the default 10 MiB upload limit; the backend remains authoritative if its configured limit differs.
