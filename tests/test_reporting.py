@@ -53,7 +53,8 @@ def _batch_result():
              "confidence": 0.96, "box": _box()},
             {"raw_text": "g", "normalized_text": "g", "confidence": 0.99, "box": _box()},
             {"raw_text": "Made in India", "normalized_text": "Made in India",
-             "confidence": 0.9, "box": _box()},
+             "confidence": 0.9, "box": _box(),
+             "source_image": "/private/temp/request/upload.png"},
         ],
         "mrp_netqty_contrast": contrast,
     }
@@ -83,6 +84,7 @@ class ReportingTests(unittest.TestCase):
                     "summary", "evidence", "warnings"):
             self.assertIn(key, report)
         self.assertEqual(report["image"]["processing_timestamp"], "2026-01-01T00:00:00Z")
+        self.assertEqual(report["ocr"]["evidence"][-1]["source_image"], "upload.png")
 
     def test_rule_evidence_links_to_extracted_field(self):
         report = build_package_report(_batch_result())

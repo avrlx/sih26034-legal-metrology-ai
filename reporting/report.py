@@ -396,6 +396,15 @@ def _processing_warnings(batch_result: dict[str, Any]) -> list[dict[str, Any]]:
     return warnings
 
 
+def _canonical_ocr_evidence(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    evidence = _json_safe(items)
+    for item in evidence:
+        source_image = item.get("source_image")
+        if source_image:
+            item["source_image"] = Path(str(source_image)).name
+    return evidence
+
+
 def build_package_report(
     batch_result: dict[str, Any], *, processing_timestamp: str | None = None,
 ) -> dict[str, Any]:
@@ -444,7 +453,7 @@ def build_package_report(
         },
         "ocr": {
             **(batch_result.get("ocr") or {}),
-            "evidence": _json_safe(ocr_items),
+            "evidence": _canonical_ocr_evidence(ocr_items),
         },
         "extracted_fields": extracted,
         "rule_results": rule_results,
