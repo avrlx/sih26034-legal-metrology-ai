@@ -317,6 +317,7 @@ def _empty_result(image_path: str | Path) -> dict[str, Any]:
         "image_quality": None,
         "aruco": {"detected": False, "pixels_per_mm": None, "marker_id": None},
         "ocr": {"success": False, "raw_item_count": 0, "filtered_item_count": 0},
+        "extracted_fields": {},
         "net_quantity": None,
         "mrp": None,
         "contrast_evidence": {"targets": {}},
@@ -417,6 +418,7 @@ def process_image(
 
         try:
             fields = field_extractor(filtered_items)
+            result["extracted_fields"] = fields
             extracted_quantity = fields.get("net_quantity")
             extracted_mrp = fields.get("mrp")
             if isinstance(extracted_quantity, dict):
@@ -475,6 +477,8 @@ def process_image(
             "threshold_basis": "implementation-defined engineering thresholds; not statutory",
             "targets": contrast_targets,
         }
+        if isinstance(result.get("extracted_fields"), dict):
+            result["extracted_fields"]["mrp_netqty_contrast"] = result["contrast_evidence"]
         contrast_status, contrast_reason = validate_mrp_netqty_contrast(
             result["contrast_evidence"]
         )
