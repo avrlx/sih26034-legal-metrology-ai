@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T20:17:20.674016+00:00",
+  "generated_at": "2026-09-01T13:12:07.055529+00:00",
   "purpose": "Engineering validation only; not Rule 7 legal compliance",
   "marker_size_mm": 50.0,
   "results": [
@@ -54,7 +54,37 @@
         "marker_area_ratio": 0.03621,
         "border_margin_px": 202.0,
         "calibration_confidence": 0.961,
-        "diagnostic_warnings": []
+        "diagnostic_warnings": [],
+        "coordinate_metadata": {
+          "image_width": 1414,
+          "image_height": 2000,
+          "coordinate_system": "original_image_pixels",
+          "marker_corners_original_image_px": [
+            [
+              884.0,
+              837.0
+            ],
+            [
+              1212.0,
+              839.0
+            ],
+            [
+              1205.0,
+              1155.0
+            ],
+            [
+              893.0,
+              1161.0
+            ]
+          ],
+          "marker_side_lengths_px": [
+            328.01,
+            312.06,
+            324.12,
+            316.08
+          ],
+          "pixels_per_mm": 6.4013
+        }
       },
       "ocr": {
         "success": true,
@@ -177,6 +207,23 @@
         "segmentation_confidence": 0.976,
         "localization_method": "ocr_token_geometry",
         "localization_confidence": 1.0,
+        "coordinate_metadata": {
+          "original_image_width": 1414,
+          "original_image_height": 2000,
+          "measurement_image_width": 1414,
+          "measurement_image_height": 2000,
+          "x_scale": 1.0,
+          "y_scale": 1.0,
+          "coordinates_already_original": true,
+          "resize_applied": false,
+          "glyph_height_measurement_image_px": 172.0,
+          "glyph_height_original_image_px": 172.0,
+          "final_height_mm": 26.869542,
+          "coordinate_consistent": true,
+          "segmentation_crop_width": 870,
+          "segmentation_crop_height": 484,
+          "coordinate_system": "original_image_pixels_with_crop_offset"
+        },
         "debug_image_path": "debug/batch_1_glyph.jpg",
         "debug_image_saved": true,
         "measurement_confidence": 0.967,
@@ -264,7 +311,28 @@
       ],
       "suspected_outliers": [
         "Image warnings: MODERATE_GLARE"
-      ]
+      ],
+      "notes": "Measure digit 1 only",
+      "known_size_sanity": {
+        "available": false,
+        "known_actual_mm": null,
+        "measured_pixel_length": null,
+        "pixels_per_mm": 6.4013,
+        "estimated_mm": null,
+        "known_size_absolute_error_mm": null,
+        "known_size_percentage_error": null,
+        "status": "AWAITING_INPUT"
+      },
+      "marker_target_distance_ratio": 0.271172,
+      "validation_status": "AWAITING_MANUAL_GROUND_TRUTH",
+      "measurement_diagnostic": {
+        "probable_failure_source": "INSUFFICIENT_EVIDENCE",
+        "diagnostic_confidence": "LOW",
+        "diagnostic_evidence": [
+          "Manual glyph and same-plane known-size measurements are needed"
+        ]
+      },
+      "probable_failure_source": "INSUFFICIENT_EVIDENCE"
     },
     {
       "image": "samples/2.jpg",
@@ -315,7 +383,37 @@
         "marker_area_ratio": 0.03621,
         "border_margin_px": 202.0,
         "calibration_confidence": 0.963,
-        "diagnostic_warnings": []
+        "diagnostic_warnings": [],
+        "coordinate_metadata": {
+          "image_width": 1414,
+          "image_height": 2000,
+          "coordinate_system": "original_image_pixels",
+          "marker_corners_original_image_px": [
+            [
+              884.0,
+              816.0
+            ],
+            [
+              1212.0,
+              818.0
+            ],
+            [
+              1205.0,
+              1134.0
+            ],
+            [
+              892.0,
+              1139.0
+            ]
+          ],
+          "marker_side_lengths_px": [
+            328.01,
+            313.04,
+            323.1,
+            316.08
+          ],
+          "pixels_per_mm": 6.4011
+        }
       },
       "ocr": {
         "success": true,
@@ -480,6 +578,23 @@
         "segmentation_confidence": 0.778,
         "localization_method": "ocr_token_geometry",
         "localization_confidence": 1.0,
+        "coordinate_metadata": {
+          "original_image_width": 1414,
+          "original_image_height": 2000,
+          "measurement_image_width": 1414,
+          "measurement_image_height": 2000,
+          "x_scale": 1.0,
+          "y_scale": 1.0,
+          "coordinates_already_original": true,
+          "resize_applied": false,
+          "glyph_height_measurement_image_px": 107.0,
+          "glyph_height_original_image_px": 107.0,
+          "final_height_mm": 16.715877,
+          "coordinate_consistent": true,
+          "segmentation_crop_width": 570,
+          "segmentation_crop_height": 238,
+          "coordinate_system": "original_image_pixels_with_crop_offset"
+        },
         "debug_image_path": "debug/batch_2_glyph.jpg",
         "debug_image_saved": true,
         "measurement_confidence": 0.928,
@@ -545,7 +660,28 @@
           "detail": "detected=3, expected=3"
         }
       ],
-      "suspected_outliers": []
+      "suspected_outliers": [],
+      "notes": "Measure the major 500 digit height",
+      "known_size_sanity": {
+        "available": false,
+        "known_actual_mm": null,
+        "measured_pixel_length": null,
+        "pixels_per_mm": 6.4011,
+        "estimated_mm": null,
+        "known_size_absolute_error_mm": null,
+        "known_size_percentage_error": null,
+        "status": "AWAITING_INPUT"
+      },
+      "marker_target_distance_ratio": 0.229758,
+      "validation_status": "AWAITING_MANUAL_GROUND_TRUTH",
+      "measurement_diagnostic": {
+        "probable_failure_source": "INSUFFICIENT_EVIDENCE",
+        "diagnostic_confidence": "LOW",
+        "diagnostic_evidence": [
+          "Manual glyph and same-plane known-size measurements are needed"
+        ]
+      },
+      "probable_failure_source": "INSUFFICIENT_EVIDENCE"
     },
     {
       "image": "samples/3.jpg",
@@ -600,7 +736,37 @@
         "marker_area_ratio": 0.03621,
         "border_margin_px": 250.0,
         "calibration_confidence": 0.961,
-        "diagnostic_warnings": []
+        "diagnostic_warnings": [],
+        "coordinate_metadata": {
+          "image_width": 1414,
+          "image_height": 2000,
+          "coordinate_system": "original_image_pixels",
+          "marker_corners_original_image_px": [
+            [
+              836.0,
+              837.0
+            ],
+            [
+              1164.0,
+              839.0
+            ],
+            [
+              1157.0,
+              1155.0
+            ],
+            [
+              845.0,
+              1161.0
+            ]
+          ],
+          "marker_side_lengths_px": [
+            328.01,
+            312.06,
+            324.12,
+            316.08
+          ],
+          "pixels_per_mm": 6.4013
+        }
       },
       "ocr": {
         "success": true,
@@ -738,6 +904,23 @@
         "segmentation_confidence": 0.977,
         "localization_method": "ocr_token_geometry",
         "localization_confidence": 1.0,
+        "coordinate_metadata": {
+          "original_image_width": 1414,
+          "original_image_height": 2000,
+          "measurement_image_width": 1414,
+          "measurement_image_height": 2000,
+          "x_scale": 1.0,
+          "y_scale": 1.0,
+          "coordinates_already_original": true,
+          "resize_applied": false,
+          "glyph_height_measurement_image_px": 116.0,
+          "glyph_height_original_image_px": 116.0,
+          "final_height_mm": 18.121319,
+          "coordinate_consistent": true,
+          "segmentation_crop_width": 855,
+          "segmentation_crop_height": 495,
+          "coordinate_system": "original_image_pixels_with_crop_offset"
+        },
         "debug_image_path": "debug/batch_3_glyph.jpg",
         "debug_image_saved": true,
         "measurement_confidence": 0.742,
@@ -829,7 +1012,28 @@
         "Image-quality analysis marked the image unusable",
         "Moderate glyph confidence (0.742)",
         "Image warnings: MODERATE_GLARE"
-      ]
+      ],
+      "notes": "Measure the major 100 digit height",
+      "known_size_sanity": {
+        "available": false,
+        "known_actual_mm": null,
+        "measured_pixel_length": null,
+        "pixels_per_mm": 6.4013,
+        "estimated_mm": null,
+        "known_size_absolute_error_mm": null,
+        "known_size_percentage_error": null,
+        "status": "AWAITING_INPUT"
+      },
+      "marker_target_distance_ratio": 0.23904,
+      "validation_status": "AWAITING_MANUAL_GROUND_TRUTH",
+      "measurement_diagnostic": {
+        "probable_failure_source": "INSUFFICIENT_EVIDENCE",
+        "diagnostic_confidence": "LOW",
+        "diagnostic_evidence": [
+          "Manual glyph and same-plane known-size measurements are needed"
+        ]
+      },
+      "probable_failure_source": "INSUFFICIENT_EVIDENCE"
     },
     {
       "image": "samples/4.jpg",
@@ -880,7 +1084,37 @@
         "marker_area_ratio": 0.036153,
         "border_margin_px": 220.0,
         "calibration_confidence": 0.959,
-        "diagnostic_warnings": []
+        "diagnostic_warnings": [],
+        "coordinate_metadata": {
+          "image_width": 1414,
+          "image_height": 2000,
+          "coordinate_system": "original_image_pixels",
+          "marker_corners_original_image_px": [
+            [
+              866.0,
+              924.0
+            ],
+            [
+              1194.0,
+              927.0
+            ],
+            [
+              1187.0,
+              1242.0
+            ],
+            [
+              875.0,
+              1248.0
+            ]
+          ],
+          "marker_side_lengths_px": [
+            328.01,
+            312.06,
+            324.12,
+            315.08
+          ],
+          "pixels_per_mm": 6.3964
+        }
       },
       "ocr": {
         "success": true,
@@ -1053,6 +1287,23 @@
         "segmentation_confidence": 0.77,
         "localization_method": "ocr_token_geometry",
         "localization_confidence": 1.0,
+        "coordinate_metadata": {
+          "original_image_width": 1414,
+          "original_image_height": 2000,
+          "measurement_image_width": 1414,
+          "measurement_image_height": 2000,
+          "x_scale": 1.0,
+          "y_scale": 1.0,
+          "coordinates_already_original": true,
+          "resize_applied": false,
+          "glyph_height_measurement_image_px": 148.0,
+          "glyph_height_original_image_px": 148.0,
+          "final_height_mm": 23.138015,
+          "coordinate_consistent": true,
+          "segmentation_crop_width": 619,
+          "segmentation_crop_height": 382,
+          "coordinate_system": "original_image_pixels_with_crop_offset"
+        },
         "debug_image_path": "debug/batch_4_glyph.jpg",
         "debug_image_saved": true,
         "measurement_confidence": 0.925,
@@ -1118,7 +1369,28 @@
           "detail": "detected=3, expected=3"
         }
       ],
-      "suspected_outliers": []
+      "suspected_outliers": [],
+      "notes": "Measure the major 500 digit height",
+      "known_size_sanity": {
+        "available": false,
+        "known_actual_mm": null,
+        "measured_pixel_length": null,
+        "pixels_per_mm": 6.3964,
+        "estimated_mm": null,
+        "known_size_absolute_error_mm": null,
+        "known_size_percentage_error": null,
+        "status": "AWAITING_INPUT"
+      },
+      "marker_target_distance_ratio": 0.197145,
+      "validation_status": "AWAITING_MANUAL_GROUND_TRUTH",
+      "measurement_diagnostic": {
+        "probable_failure_source": "INSUFFICIENT_EVIDENCE",
+        "diagnostic_confidence": "LOW",
+        "diagnostic_evidence": [
+          "Manual glyph and same-plane known-size measurements are needed"
+        ]
+      },
+      "probable_failure_source": "INSUFFICIENT_EVIDENCE"
     },
     {
       "image": "samples/5.jpg",
@@ -1139,6 +1411,11 @@
         "detected": false,
         "pixels_per_mm": null,
         "marker_id": null,
+        "coordinate_metadata": {
+          "image_width": 1414,
+          "image_height": 2000,
+          "coordinate_system": "original_image_pixels"
+        },
         "diagnostic": "Quadrilateral candidates were found, but none decoded as the configured marker",
         "failure_reason": "Quadrilateral candidates were found, but none decoded as the configured marker",
         "rejected_candidate_count": 31,
@@ -1275,7 +1552,28 @@
         "ArUco calibration was not detected",
         "ArUco calibration is missing",
         "Low glyph confidence (0.000)"
-      ]
+      ],
+      "notes": "Measure digit 1 only; CV error remains unavailable until ArUco calibration succeeds",
+      "known_size_sanity": {
+        "available": false,
+        "known_actual_mm": null,
+        "measured_pixel_length": null,
+        "pixels_per_mm": null,
+        "estimated_mm": null,
+        "known_size_absolute_error_mm": null,
+        "known_size_percentage_error": null,
+        "status": "AWAITING_INPUT"
+      },
+      "marker_target_distance_ratio": null,
+      "validation_status": "CALIBRATION_REQUIRED",
+      "measurement_diagnostic": {
+        "probable_failure_source": "CALIBRATION",
+        "diagnostic_confidence": "HIGH",
+        "diagnostic_evidence": [
+          "ArUco calibration is unavailable; physical scale cannot be inferred"
+        ]
+      },
+      "probable_failure_source": "CALIBRATION"
     }
   ],
   "summary": {
@@ -1313,6 +1611,14 @@
       "Glyph status was OK for 4/5 images; 3/5 were usable end to end.",
       "Median successful glyph confidence was 0.927.",
       "Severe geometry-check failures occurred in 0 successful measurements."
+    ],
+    "manual_ground_truth_readiness": "READY_FOR_MANUAL_GROUND_TRUTH",
+    "manual_ground_truth_readiness_reasoning": [
+      "Explicit coordinate mismatches found: 0.",
+      "Calibrated glyph measurements available: 4/5.",
+      "Manual numeral heights supplied: 0/5.",
+      "Known-size sanity checks supplied: 0/5.",
+      "Software readiness does not validate physical accuracy; manual and known-size measurements remain required."
     ]
   },
   "before_after": [

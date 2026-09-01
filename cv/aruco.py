@@ -39,6 +39,7 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
         image,
         cv2.COLOR_BGR2GRAY
     )
+    image_height, image_width = gray.shape
 
     dictionary = cv2.aruco.getPredefinedDictionary(
         cv2.aruco.DICT_4X4_50
@@ -58,6 +59,11 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
             "detected": False,
             "pixels_per_mm": None,
             "marker_id": None,
+            "coordinate_metadata": {
+                "image_width": int(image_width),
+                "image_height": int(image_height),
+                "coordinate_system": "original_image_pixels",
+            },
             **_failure_diagnostics(gray, rejected),
         }
 
@@ -134,4 +140,12 @@ def detect_aruco_scale(image_path, marker_size_mm=50.0):
         "border_margin_px": round(border_margin, 2),
         "calibration_confidence": round(float(confidence), 3),
         "diagnostic_warnings": warnings,
+        "coordinate_metadata": {
+            "image_width": int(width),
+            "image_height": int(height),
+            "coordinate_system": "original_image_pixels",
+            "marker_corners_original_image_px": marker.tolist(),
+            "marker_side_lengths_px": [round(float(value), 2) for value in side_lengths],
+            "pixels_per_mm": round(float(pixels_per_mm), 4),
+        },
     }

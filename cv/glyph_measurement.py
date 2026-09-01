@@ -11,6 +11,8 @@ from typing import Any, Iterable, Sequence
 import cv2
 import numpy as np
 
+from cv.validation import coordinate_scale_metadata
+
 
 Box = Sequence[float] | Sequence[Sequence[float]]
 
@@ -428,6 +430,7 @@ def _save_debug_image(
     estimated_height_mm: float | None,
     annotation: str,
     debug_image_path: str,
+    marker_corners: Any = None,
 ) -> bool:
     debug = image.copy()
     cv2.rectangle(debug, source_box[:2], source_box[2:], (255, 0, 0), 2)
@@ -436,11 +439,36 @@ def _save_debug_image(
         cv2.rectangle(debug, box[:2], box[2:], (0, 0, 180), 1)
     for box in digit_boxes:
         cv2.rectangle(debug, box[:2], box[2:], (0, 255, 0), 2)
+    if marker_corners:
+        try:
+            marker = np.asarray(marker_corners, dtype=np.int32).reshape(-1, 1, 2)
+            cv2.polylines(debug, [marker], True, (255, 0, 255), 3)
+            marker_points = marker.reshape(-1, 2)
+            side_lengths = [
+                float(np.linalg.norm(marker_points[(index + 1) % 4] - marker_points[index]))
+                for index in range(4)
+            ]
+            cv2.putText(
+                debug,
+                f"ArUco mean side={np.mean(side_lengths):.1f}px",
+                tuple(marker_points[0]),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.48,
+                (180, 0, 180),
+                1,
+                cv2.LINE_AA,
+            )
+        except (TypeError, ValueError):
+            pass
     if estimated_height_mm is not None:
         label_y = max(20, source_box[1] - 8)
+        accepted_heights = [box[3] - box[1] for box in digit_boxes if len(box) >= 4]
+        height_px_text = (
+            f"{float(np.median(accepted_heights)):.1f}px / " if accepted_heights else ""
+        )
         cv2.putText(
             debug,
-            f"numeral height: {estimated_height_mm:.3f} mm",
+            f"numeral height: {height_px_text}{estimated_height_mm:.3f}mm",
             (source_box[0], label_y),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
@@ -472,6 +500,7 @@ def measure_net_quantity_numerals(
     debug: bool = False,
     debug_dir: str | Path | None = None,
     debug_image_path: str | None = None,
+    marker_corners: Any = None,
 ) -> dict[str, Any]:
     """Estimate printed numeral height using calibrated connected components.
 
@@ -754,6 +783,7 @@ def measure_net_quantity_numerals(
                 None,
                 f"numeric={numeric_text} | {value_region_method} | seg_conf={confidence:.3f}",
                 requested_path,
+                marker_corners,
             )
         return result
 
@@ -843,6 +873,21 @@ def measure_net_quantity_numerals(
         "localization_method": value_region_method,
         "localization_confidence": round(region_score, 3),
     }
+    coordinate_metadata = coordinate_scale_metadata(
+        original_width=image_width,
+        original_height=image_height,
+        measurement_width=image_width,
+        measurement_height=image_height,
+        glyph_height_measurement_px=estimated_height_px,
+        coordinates_already_original=True,
+        pixels_per_mm=calibration_value,
+    )
+    coordinate_metadata.update({
+        "segmentation_crop_width": int(crop.shape[1]),
+        "segmentation_crop_height": int(crop.shape[0]),
+        "coordinate_system": "original_image_pixels_with_crop_offset",
+    })
+    result["coordinate_metadata"] = coordinate_metadata
     if debug and not debug_image_path:
         output_directory = Path(debug_dir) if debug_dir is not None else Path("debug")
         debug_image_path = str(output_directory / f"glyph_measurement_{Path(image_path).stem}.jpg")
@@ -857,6 +902,7 @@ def measure_net_quantity_numerals(
             estimated_height_mm,
             f"numeric={numeric_text} | {value_region_method} | seg_conf={confidence:.3f}",
             debug_image_path,
+            marker_corners,
         )
     return result
 

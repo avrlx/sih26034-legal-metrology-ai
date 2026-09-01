@@ -24,6 +24,13 @@ from cv.measurement_confidence import aggregate_measurement_confidence
 from cv.ocr import predict_ocr_items, recover_split_quantity_items
 from cv.ocr_filter import filter_ocr_items_near_aruco
 from cv.quality import analyze_image_quality
+from cv.validation import (
+    calculate_known_size_sanity,
+    calculate_manual_error,
+    classify_probable_failure_source,
+    load_ground_truth,
+    marker_target_distance_ratio,
+)
 from extract_fields import extract_fields
 
 
@@ -34,6 +41,7 @@ JSON_OUTPUT = Path("results/measurement_validation.json")
 CSV_OUTPUT = Path("results/measurement_validation.csv")
 BEFORE_JSON = Path("results/measurement_validation_before.json")
 COMPARISON_CSV = Path("results/measurement_validation_comparison.csv")
+GROUND_TRUTH_INPUT = Path("results/measurement_ground_truth.json")
 
 CSV_COLUMNS = [
     "image",
@@ -66,33 +74,15 @@ CSV_COLUMNS = [
     "manual_height_mm",
     "absolute_error_mm",
     "percentage_error",
+    "known_actual_mm",
+    "measured_pixel_length",
+    "known_size_estimated_mm",
+    "known_size_absolute_error_mm",
+    "known_size_percentage_error",
+    "validation_status",
+    "probable_failure_source",
+    "notes",
 ]
-
-
-def calculate_manual_error(
-    cv_height_mm: float | None,
-    manual_height_mm: float | None,
-) -> dict[str, float | None]:
-    """Calculate reusable CV-vs-manual errors without dividing by zero."""
-    if cv_height_mm is None or manual_height_mm is None:
-        return {"absolute_error_mm": None, "percentage_error": None}
-    try:
-        cv_height = float(cv_height_mm)
-        manual_height = float(manual_height_mm)
-    except (TypeError, ValueError):
-        return {"absolute_error_mm": None, "percentage_error": None}
-    if not math.isfinite(cv_height) or not math.isfinite(manual_height):
-        return {"absolute_error_mm": None, "percentage_error": None}
-    absolute_error = abs(cv_height - manual_height)
-    percentage_error = (
-        absolute_error / manual_height * 100.0 if manual_height != 0 else None
-    )
-    return {
-        "absolute_error_mm": round(absolute_error, 6),
-        "percentage_error": (
-            round(percentage_error, 6) if percentage_error is not None else None
-        ),
-    }
 
 
 def make_json_safe(value: Any) -> Any:
@@ -444,6 +434,7 @@ def process_image(
                     pixels_per_mm,
                     debug=debug_path is not None,
                     debug_image_path=debug_image_path,
+                    marker_corners=result["aruco"].get("corners"),
                 )
                 if result["glyph_measurement"].get("status") != "OK":
                     _record_failure(
@@ -524,10 +515,12 @@ def process_batch(
     *,
     processor: Callable[..., dict[str, Any]] = process_image,
     debug_directory: str | Path = "debug",
+    ground_truth_path: str | Path | None = GROUND_TRUTH_INPUT,
 ) -> list[dict[str, Any]]:
     """Process every image, converting even unexpected per-image errors to REVIEW."""
     results = []
     debug_root = Path(debug_directory)
+    ground_truth = load_ground_truth(ground_truth_path) if ground_truth_path else {}
     for index, image_path in enumerate(image_paths, start=1):
         debug_path = debug_root / f"batch_{index}_glyph.jpg"
         try:
@@ -536,8 +529,65 @@ def process_batch(
             result = _empty_result(image_path)
             _record_failure(result, "unexpected_exception", str(exc))
             result = _finalize_image_result(result)
-        results.append(result)
+        entry = ground_truth.get(str(image_path)) or ground_truth.get(Path(str(image_path)).name) or {}
+        results.append(apply_ground_truth_validation(result, entry))
     return results
+
+
+def apply_ground_truth_validation(
+    result: dict[str, Any],
+    ground_truth: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Attach manual comparison, sanity-check, and conservative diagnostics."""
+    entry = ground_truth or {}
+    glyph = result.get("glyph_measurement") or {}
+    aruco = result.get("aruco") or {}
+    quality = result.get("image_quality") or {}
+    manual_height = entry.get("manual_height_mm")
+    cv_height = glyph.get("estimated_numeral_height_mm")
+    result["manual_height_mm"] = manual_height
+    result.update(calculate_manual_error(cv_height, manual_height))
+    result["notes"] = entry.get("notes")
+    sanity = calculate_known_size_sanity(
+        entry.get("known_actual_mm"),
+        entry.get("measured_pixel_length"),
+        aruco.get("pixels_per_mm"),
+    )
+    result["known_size_sanity"] = sanity
+    result["marker_target_distance_ratio"] = (
+        round(distance, 6)
+        if (distance := marker_target_distance_ratio(
+            aruco.get("corners"),
+            glyph.get("digit_boxes"),
+            quality.get("width"),
+            quality.get("height"),
+        )) is not None
+        else None
+    )
+    if manual_height is None:
+        validation_status = (
+            "AWAITING_MANUAL_GROUND_TRUTH"
+            if aruco.get("detected")
+            else "CALIBRATION_REQUIRED"
+        )
+    elif cv_height is None or not aruco.get("detected"):
+        validation_status = "CV_MEASUREMENT_UNAVAILABLE"
+    else:
+        validation_status = "MANUAL_COMPARISON_AVAILABLE"
+    sanity_error = sanity.get("known_size_percentage_error")
+    if isinstance(sanity_error, (int, float)) and sanity_error > 10.0:
+        validation_status = "CALIBRATION_REVIEW_REQUIRED"
+        result["status"] = "REVIEW"
+        result["measurement_quality_flag"] = "REVIEW"
+        reasons = list(result.get("measurement_quality_reasons") or [])
+        reasons.append(f"Known-size calibration sanity error is {sanity_error:.2f}%")
+        result["measurement_quality_reasons"] = list(dict.fromkeys(reasons))
+        result["suspected_outliers"] = result["measurement_quality_reasons"]
+    result["validation_status"] = validation_status
+    diagnostic = classify_probable_failure_source(result)
+    result["measurement_diagnostic"] = diagnostic
+    result["probable_failure_source"] = diagnostic["probable_failure_source"]
+    return make_json_safe(result)
 
 
 def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
@@ -621,6 +671,25 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         f"Severe geometry-check failures occurred in {geometry_failures} successful measurements.",
     ]
+    coordinate_mismatches = sum(
+        bool((item.get("glyph_measurement") or {}).get("coordinate_metadata"))
+        and not (item.get("glyph_measurement") or {}).get("coordinate_metadata", {}).get("coordinate_consistent", False)
+        for item in results
+    )
+    manual_value_count = sum(item.get("manual_height_mm") is not None for item in results)
+    known_size_check_count = sum(
+        bool((item.get("known_size_sanity") or {}).get("available")) for item in results
+    )
+    ready_for_manual = (
+        coordinate_mismatches == 0
+        and aruco_success >= min(4, total)
+        and len(glyph_ok_results) >= min(4, total)
+    )
+    manual_readiness = (
+        "READY_FOR_MANUAL_GROUND_TRUTH"
+        if ready_for_manual
+        else "NEEDS_CODE_FIX_BEFORE_MANUAL_VALIDATION"
+    )
     return make_json_safe({
         "images_processed": total,
         "image_quality_pass_count": quality_pass,
@@ -643,6 +712,14 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "readiness": readiness,
         "readiness_checks": readiness_checks,
         "readiness_reasoning": reasoning,
+        "manual_ground_truth_readiness": manual_readiness,
+        "manual_ground_truth_readiness_reasoning": [
+            f"Explicit coordinate mismatches found: {coordinate_mismatches}.",
+            f"Calibrated glyph measurements available: {len(glyph_ok_results)}/{total}.",
+            f"Manual numeral heights supplied: {manual_value_count}/{total}.",
+            f"Known-size sanity checks supplied: {known_size_check_count}/{total}.",
+            "Software readiness does not validate physical accuracy; manual and known-size measurements remain required.",
+        ],
     })
 
 
@@ -683,6 +760,14 @@ def _csv_row(result: dict[str, Any]) -> dict[str, Any]:
         "manual_height_mm": result.get("manual_height_mm"),
         "absolute_error_mm": result.get("absolute_error_mm"),
         "percentage_error": result.get("percentage_error"),
+        "known_actual_mm": (result.get("known_size_sanity") or {}).get("known_actual_mm"),
+        "measured_pixel_length": (result.get("known_size_sanity") or {}).get("measured_pixel_length"),
+        "known_size_estimated_mm": (result.get("known_size_sanity") or {}).get("estimated_mm"),
+        "known_size_absolute_error_mm": (result.get("known_size_sanity") or {}).get("known_size_absolute_error_mm"),
+        "known_size_percentage_error": (result.get("known_size_sanity") or {}).get("known_size_percentage_error"),
+        "validation_status": result.get("validation_status"),
+        "probable_failure_source": result.get("probable_failure_source"),
+        "notes": result.get("notes"),
     }
 
 
@@ -815,6 +900,10 @@ def main() -> int:
     print(f"\nReadiness: {summary['readiness']}")
     for reason in summary["readiness_reasoning"]:
         print(f"- {reason}")
+    print(f"\nManual validation readiness: {summary['manual_ground_truth_readiness']}")
+    for reason in summary["manual_ground_truth_readiness_reasoning"]:
+        print(f"- {reason}")
+    print(f"\nGround truth input: {GROUND_TRUTH_INPUT}")
     print(f"\nJSON: {JSON_OUTPUT}")
     print(f"CSV:  {CSV_OUTPUT}")
     return 0

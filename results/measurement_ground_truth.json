@@ -1,0 +1,11 @@
+{
+  "purpose": "Editable manual physical measurements for engineering validation; not legal Rule 7 decisions",
+  "instructions": "Enter actual numeral glyph height in millimetres. For a same-plane known-size check, enter both known_actual_mm and measured_pixel_length from the unchanged original image. Leave unknown values null.",
+  "measurements": [
+    {"image": "samples/1.jpg", "quantity": "1 L", "manual_height_mm": null, "known_actual_mm": null, "measured_pixel_length": null, "notes": "Measure digit 1 only"},
+    {"image": "samples/2.jpg", "quantity": "500 ML", "manual_height_mm": null, "known_actual_mm": null, "measured_pixel_length": null, "notes": "Measure the major 500 digit height"},
+    {"image": "samples/3.jpg", "quantity": "100 G", "manual_height_mm": null, "known_actual_mm": null, "measured_pixel_length": null, "notes": "Measure the major 100 digit height"},
+    {"image": "samples/4.jpg", "quantity": "500 G", "manual_height_mm": null, "known_actual_mm": null, "measured_pixel_length": null, "notes": "Measure the major 500 digit height"},
+    {"image": "samples/5.jpg", "quantity": "1 KG", "manual_height_mm": null, "known_actual_mm": null, "measured_pixel_length": null, "notes": "Measure digit 1 only; CV error remains unavailable until ArUco calibration succeeds"}
+  ]
+}
