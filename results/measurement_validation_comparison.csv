@@ -1,6 +1,6 @@
 image,before_quantity,after_quantity,before_glyph_status,after_glyph_status,before_height_mm,after_height_mm,before_confidence,after_confidence,before_quality_flag,after_quality_flag,change,manual_height_mm,absolute_error_mm,percentage_error
-1.jpg,,1L,REVIEW,OK,,26.87,0.0,0.976,REVIEW,CHECK,newly extracted and measured,,,
-2.jpg,Net Vol: 500 ml,Net Vol: 500 ml,OK,OK,5.312,16.716,0.93,0.921,CHECK,GOOD,confidence now includes image/calibration quality,,,
-3.jpg,100 g,100 g,OK,OK,18.121,18.121,0.959,0.851,REVIEW,REVIEW,confidence now includes image/calibration quality,,,
-4.jpg,Net Wt: 500 g,Net Wt: 500 g,REVIEW,OK,,23.138,0.167,0.917,REVIEW,GOOD,geometry localization corrected,,,
+1.jpg,,1L,REVIEW,OK,,26.87,0.0,0.967,REVIEW,CHECK,newly extracted and measured,,,
+2.jpg,Net Vol: 500 ml,Net Vol: 500 ml,OK,OK,5.312,16.716,0.93,0.928,CHECK,GOOD,confidence now includes image/calibration quality,,,
+3.jpg,100 g,100 g,OK,OK,18.121,18.121,0.959,0.742,REVIEW,REVIEW,confidence now includes image/calibration quality,,,
+4.jpg,Net Wt: 500 g,Net Wt: 500 g,REVIEW,OK,,23.138,0.167,0.925,REVIEW,GOOD,geometry localization corrected,,,
 5.jpg,Net Wt: 1 kg,Net Wt: 1 kg,REVIEW,REVIEW,,,0.0,0.0,REVIEW,REVIEW,remains REVIEW; no measurement claimed,,,

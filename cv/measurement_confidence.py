@@ -39,8 +39,10 @@ def aggregate_measurement_confidence(
     """Combine independent trust links with a weighted geometric mean.
 
     The score is ``exp(sum(weight_i * log(clamp(factor_i))))``. Weights sum
-    to one: segmentation .30, localization .18, OCR .10, expected digit count
-    .12, height agreement .10, image quality .10, and calibration .10. This
+    to one: segmentation .27, localization .15, OCR .08, expected digit count
+    .10, height agreement .10, image quality .20, and calibration .10. Capture
+    quality receives material weight because glare/blur can invalidate otherwise
+    clean component geometry. This
     keeps the score interpretable while ensuring one weak trust link cannot be
     hidden by several strong arithmetic-average terms.
     """
@@ -57,12 +59,12 @@ def aggregate_measurement_confidence(
         calibration.get("calibration_confidence", 1.0 if calibration.get("detected") else 0.0) or 0.0
     )
     values = {
-        "segmentation": (segmentation, 0.30),
-        "localization": (localization, 0.18),
-        "ocr": (ocr, 0.10),
-        "digit_count": (digit_count, 0.12),
+        "segmentation": (segmentation, 0.27),
+        "localization": (localization, 0.15),
+        "ocr": (ocr, 0.08),
+        "digit_count": (digit_count, 0.10),
         "height_agreement": (height_agreement, 0.10),
-        "image_quality": (image_factor, 0.10),
+        "image_quality": (image_factor, 0.20),
         "calibration": (calibration_factor, 0.10),
     }
     if glyph.get("status") != "OK" or not calibration.get("detected"):

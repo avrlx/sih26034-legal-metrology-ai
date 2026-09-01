@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-31T20:12:59.784869+00:00",
+  "generated_at": "2026-08-31T20:17:20.674016+00:00",
   "purpose": "Engineering validation only; not Rule 7 legal compliance",
   "marker_size_mm": 50.0,
   "results": [
@@ -179,7 +179,7 @@
         "localization_confidence": 1.0,
         "debug_image_path": "debug/batch_1_glyph.jpg",
         "debug_image_saved": true,
-        "measurement_confidence": 0.976,
+        "measurement_confidence": 0.967,
         "image_quality_factor": 0.9,
         "calibration_confidence": 0.961,
         "measurement_confidence_factors": {
@@ -482,7 +482,7 @@
         "localization_confidence": 1.0,
         "debug_image_path": "debug/batch_2_glyph.jpg",
         "debug_image_saved": true,
-        "measurement_confidence": 0.921,
+        "measurement_confidence": 0.928,
         "image_quality_factor": 1.0,
         "calibration_confidence": 0.963,
         "measurement_confidence_factors": {
@@ -740,7 +740,7 @@
         "localization_confidence": 1.0,
         "debug_image_path": "debug/batch_3_glyph.jpg",
         "debug_image_saved": true,
-        "measurement_confidence": 0.851,
+        "measurement_confidence": 0.742,
         "image_quality_factor": 0.25,
         "calibration_confidence": 0.961,
         "measurement_confidence_factors": {
@@ -760,6 +760,7 @@
       "measurement_quality_flag": "REVIEW",
       "measurement_quality_reasons": [
         "Image-quality analysis marked the image unusable",
+        "Moderate glyph confidence (0.742)",
         "Image warnings: MODERATE_GLARE"
       ],
       "consistency_checks": [
@@ -826,6 +827,7 @@
       ],
       "suspected_outliers": [
         "Image-quality analysis marked the image unusable",
+        "Moderate glyph confidence (0.742)",
         "Image warnings: MODERATE_GLARE"
       ]
     },
@@ -1053,7 +1055,7 @@
         "localization_confidence": 1.0,
         "debug_image_path": "debug/batch_4_glyph.jpg",
         "debug_image_saved": true,
-        "measurement_confidence": 0.917,
+        "measurement_confidence": 0.925,
         "image_quality_factor": 1.0,
         "calibration_confidence": 0.959,
         "measurement_confidence_factors": {
@@ -1284,10 +1286,10 @@
     "glyph_measurement_ok_count": 4,
     "glyph_review_count": 1,
     "end_to_end_measurement_usable_count": 3,
-    "mean_glyph_confidence": 0.916,
-    "median_glyph_confidence": 0.919,
-    "minimum_glyph_confidence": 0.851,
-    "maximum_glyph_confidence": 0.976,
+    "mean_glyph_confidence": 0.891,
+    "median_glyph_confidence": 0.927,
+    "minimum_glyph_confidence": 0.742,
+    "maximum_glyph_confidence": 0.967,
     "minimum_glyph_height_mm": 16.716,
     "maximum_glyph_height_mm": 26.87,
     "median_glyph_height_mm": 20.63,
@@ -1309,7 +1311,7 @@
       "ArUco calibration succeeded for 4/5 images.",
       "Net quantity extraction succeeded for 5/5 images.",
       "Glyph status was OK for 4/5 images; 3/5 were usable end to end.",
-      "Median successful glyph confidence was 0.919.",
+      "Median successful glyph confidence was 0.927.",
       "Severe geometry-check failures occurred in 0 successful measurements."
     ]
   },
@@ -1323,7 +1325,7 @@
       "before_height_mm": null,
       "after_height_mm": 26.87,
       "before_confidence": 0.0,
-      "after_confidence": 0.976,
+      "after_confidence": 0.967,
       "before_quality_flag": "REVIEW",
       "after_quality_flag": "CHECK",
       "change": "newly extracted and measured",
@@ -1340,7 +1342,7 @@
       "before_height_mm": 5.312,
       "after_height_mm": 16.716,
       "before_confidence": 0.93,
-      "after_confidence": 0.921,
+      "after_confidence": 0.928,
       "before_quality_flag": "CHECK",
       "after_quality_flag": "GOOD",
       "change": "confidence now includes image/calibration quality",
@@ -1357,7 +1359,7 @@
       "before_height_mm": 18.121,
       "after_height_mm": 18.121,
       "before_confidence": 0.959,
-      "after_confidence": 0.851,
+      "after_confidence": 0.742,
       "before_quality_flag": "REVIEW",
       "after_quality_flag": "REVIEW",
       "change": "confidence now includes image/calibration quality",
@@ -1374,7 +1376,7 @@
       "before_height_mm": null,
       "after_height_mm": 23.138,
       "before_confidence": 0.167,
-      "after_confidence": 0.917,
+      "after_confidence": 0.925,
       "before_quality_flag": "REVIEW",
       "after_quality_flag": "GOOD",
       "change": "geometry localization corrected",
