@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import tempfile
 from pathlib import Path
@@ -92,6 +93,15 @@ class PackageAnalyzer:
             safe_result["extracted_fields"] = enhance_extracted_fields(
                 safe_result.get("extracted_fields") or {}
             )
+            enhanced_fields = safe_result["extracted_fields"]
+            mrp = enhanced_fields.get("mrp")
+            if isinstance(mrp, dict):
+                ocr_text = "\n".join(
+                    str(item.get("raw_text") or item.get("normalized_text") or "")
+                    for item in (enhanced_fields.get("ocr_evidence") or [])
+                )
+                if re.search(r"(?:INCLUSIVE\s+OF|INCL\.?\s+OF)\s+ALL\s+TAXES", ocr_text, re.I):
+                    mrp["inclusive_of_all_taxes"] = True
 
             # Feed measured engineering evidence into the deterministic Rule 7
             # validator. The principal display-panel area is intentionally not
