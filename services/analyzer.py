@@ -19,7 +19,10 @@ class PackageAnalysisError(RuntimeError):
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
-    return PaddleOCR(lang="en")
+    return PaddleOCR(
+        lang="en",
+        enable_mkldnn=False,
+    )
 
 
 class PackageAnalyzer:
@@ -80,6 +83,22 @@ class PackageAnalyzer:
             safe_result = scrub_local_paths(batch_result)
             safe_result["evidence_images"] = evidence_images
             safe_result["image"] = Path(display_filename).name
+
+            # Feed measured engineering evidence into the deterministic Rule 7
+            # validator. The principal display-panel area is intentionally not
+            # guessed: if it is unavailable, Rule 7 remains REVIEW.
+            extracted_fields = dict(safe_result.get("extracted_fields") or {})
+            extracted_fields["font_height_measurement"] = safe_result.get("glyph_measurement")
+            if safe_result.get("principal_display_panel_area_cm2") is not None:
+                extracted_fields["principal_display_panel_area_cm2"] = safe_result[
+                    "principal_display_panel_area_cm2"
+                ]
+            if safe_result.get("package_surface_formed") is not None:
+                extracted_fields["package_surface_formed"] = safe_result[
+                    "package_surface_formed"
+                ]
+            safe_result["extracted_fields"] = extracted_fields
+
             return self._report_builder(safe_result)
         except PackageAnalysisError:
             raise
