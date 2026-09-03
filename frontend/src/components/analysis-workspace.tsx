@@ -269,19 +269,22 @@ export function AnalysisWorkspace() {
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-lg border border-white/15 bg-white/10"><ShieldCheck className="size-5" /></div>
             <div>
-              <p className="font-semibold tracking-tight">PackSure</p>
-              <p className="text-[11px] uppercase tracking-[0.16em] text-sky-200">Legal Metrology Review</p>
+              <p className="font-semibold tracking-tight">ComplyVision</p>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-sky-200">AI-Powered Legal Metrology</p>
             </div>
           </div>
-          <ServiceIndicator state={service} />
+          <div className="flex items-center gap-4">
+            <span className="hidden text-xs text-sky-200 sm:inline">See. Verify. Comply.</span>
+            <ServiceIndicator state={service} />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-9 sm:px-6 sm:py-12 lg:px-8">
         <div className="mb-8 max-w-3xl">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800"><Activity className="size-4" /> SIH 2026 prototype</div>
+          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-800"><Activity className="size-4" /> SIH 2026 · PS26034</div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Package compliance, with evidence attached.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">Inspect declarations, image quality, and rule-level evidence through the existing Legal Metrology analysis pipeline.</p>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">Inspect declarations, image quality, and rule-level evidence through the Legal Metrology analysis pipeline.</p>
         </div>
 
         {requestError && !analyzing && !report && (
@@ -304,7 +307,7 @@ export function AnalysisWorkspace() {
       </main>
 
       <footer className="border-t border-slate-200 bg-white/80 px-4 py-5 text-center text-xs text-slate-500">
-        Decision-support prototype · Not an official compliance certificate or legal opinion
+        ComplyVision · Decision-support prototype · Not an official compliance certificate or legal opinion
       </footer>
     </div>
   );
