@@ -75,23 +75,28 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
             continue
         inline = MRP_LABEL.sub("", label["text"], count=1)
         match = PRICE.search(inline)
-        if match and not UNIT_PRICE.search(inline):
+        if match and not UNIT_PRICE.search(inline) and "%" not in inline:
             return {"currency": "INR", "value": float(match.group(1)), "inclusive_of_all_taxes": bool(re.search(r"(?:INCLUSIVE|INCL\.?\s*OF)\s+ALL\s+TAXES", label["text"], re.I)), **_ev(label, "explicit_mrp_label")}
+
         candidates = []
         for distance in range(1, 7):
             for j in (i - distance, i + distance):
                 if not 0 <= j < len(items):
                     continue
                 candidate = items[j]
-                if UNIT_PRICE.search(candidate["text"]):
+                text = candidate["text"].strip()
+                # Never treat percentages, unit-sale-price text, or nutrition-style
+                # "per ..." values as the retail MRP amount.
+                if UNIT_PRICE.search(text) or "%" in text or re.search(r"\b(?:PER|USP|UNIT\s+SALE)\b", text, re.I):
                     continue
-                match = PRICE.fullmatch(candidate["text"].strip()) or PRICE.search(candidate["text"])
-                if not match or re.search(r"\b(?:PER|USP|UNIT\s+SALE)\b", candidate["text"], re.I):
+                match = PRICE.fullmatch(text) or PRICE.search(text)
+                if not match:
                     continue
                 score = 100 - distance * 12 + candidate["confidence"] * 10
                 if j == i - 1: score += 18
                 if j == i + 1: score += 14
-                if re.search(r"₹|\bRS\.?\b|\bINR\b|/-", candidate["text"], re.I): score += 15
+                if re.search(r"₹|\bRS\.?\b|\bINR\b|/-", text, re.I): score += 25
+                if re.fullmatch(r"\d{1,6}(?:\.\d{1,2})?", text): score += 8
                 candidates.append((score, candidate, float(match.group(1))))
         if candidates:
             _, candidate, amount = max(candidates, key=lambda x: x[0])
