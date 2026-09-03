@@ -10,6 +10,7 @@ from typing import Any, Callable
 from batch_measure import process_image
 from reporting.report import build_package_report
 from services.evidence import build_evidence_images, scrub_local_paths
+from services.extraction_enhancements import add_enhanced_report_fields, enhance_extracted_fields
 
 
 class PackageAnalysisError(RuntimeError):
@@ -84,6 +85,14 @@ class PackageAnalyzer:
             safe_result["evidence_images"] = evidence_images
             safe_result["image"] = Path(display_filename).name
 
+            # OCR can detect a declaration correctly while the generic field
+            # extractor chooses the wrong nearby numeric/text candidate. Run a
+            # deterministic semantic pass over the OCR evidence before the
+            # canonical report and rule engine consume the fields.
+            safe_result["extracted_fields"] = enhance_extracted_fields(
+                safe_result.get("extracted_fields") or {}
+            )
+
             # Feed measured engineering evidence into the deterministic Rule 7
             # validator. The principal display-panel area is intentionally not
             # guessed: if it is unavailable, Rule 7 remains REVIEW.
@@ -99,7 +108,8 @@ class PackageAnalyzer:
                 ]
             safe_result["extracted_fields"] = extracted_fields
 
-            return self._report_builder(safe_result)
+            report = self._report_builder(safe_result)
+            return add_enhanced_report_fields(report, safe_result["extracted_fields"])
         except PackageAnalysisError:
             raise
         except Exception as exc:
