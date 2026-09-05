@@ -9,6 +9,7 @@
 ```text
 Browser
   → ComplyVision Next.js frontend
+  → Supabase Auth / Postgres (identity + protected inspection history)
   → FastAPI
   → PackageAnalyzer
   → process_image
@@ -17,13 +18,14 @@ Browser
   → compliance dashboard
 ```
 
-The Python backend is the single source of truth. The frontend validates obvious upload mistakes, calls the API, and presents fields and evidence from canonical report version `1.0`.
+The Python backend remains the single source of truth for AI analysis and Legal Metrology decisions. Supabase provides authentication, persistent inspection records, profiles/roles, and Row Level Security.
 
 ## Prerequisites
 
 - Python 3.12 and a project virtual environment at `.venv/`
-- Node.js 20 or newer
+- Node.js 22 or newer
 - npm
+- A Supabase project
 
 ## Backend setup
 
@@ -36,6 +38,24 @@ From the repository root:
 
 PaddleOCR is initialized lazily on the first analysis request and reused afterward. `GET /health` does not initialize OCR.
 
+## Supabase setup
+
+1. Create a project in the Supabase Dashboard.
+2. Open **SQL Editor** and run `supabase/migrations/001_initial_schema.sql`.
+3. In **Authentication → Providers**, keep Email enabled.
+4. For normal account security, keep email confirmation enabled.
+5. In **Authentication → URL Configuration**, add `http://localhost:3000/auth/callback` as an allowed redirect URL.
+6. Copy the Project URL and Publishable Key from the Supabase Connect/API settings.
+
+The migration creates:
+
+- `profiles` — authenticated user profile and workspace role (`inspector`, `reviewer`, `admin`).
+- `inspections` — persisted canonical inspection reports linked to the authenticated user.
+- RLS policies so users can access only their own inspection history and profile.
+- An Auth trigger that creates a profile row whenever a new Auth user is created.
+
+Never put a Supabase secret/service-role key in the browser or commit it to Git. The frontend uses the publishable key together with RLS.
+
 ## Frontend setup
 
 In a second terminal:
@@ -43,11 +63,33 @@ In a second terminal:
 ```bash
 cd frontend
 cp .env.example .env.local
-npm ci
+npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Select a JPEG or PNG package image and choose **Analyze package**.
+Set these values in `frontend/.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+```
+
+Open `http://localhost:3000`. Unauthenticated visitors are redirected to `/login`.
+
+## Authentication and persistence
+
+ComplyVision uses Supabase's cookie-based SSR Auth integration through `@supabase/ssr` and the Next.js 16 `proxy.ts` convention.
+
+Supported flow:
+
+1. Create an account with email/password.
+2. Confirm the email if email confirmation is enabled.
+3. Sign in.
+4. Access the protected inspection workspace.
+5. Every completed AI analysis is saved to `public.inspections` for the signed-in user.
+6. Sign out from the account menu.
 
 ## Dashboard behavior
 
@@ -61,6 +103,7 @@ ComplyVision currently provides:
 6. Rule-level explanations with evidence and applicable legal-source identifiers.
 7. Canonical JSON and presentation-oriented Markdown report export.
 8. Demo package images that use the same `/analyze` API path as normal uploads.
+9. Supabase-backed authenticated inspection persistence.
 
 The current frontend branding is **ComplyVision — AI-Powered Legal Metrology** with the tagline **See. Verify. Comply.**
 
@@ -108,7 +151,7 @@ The benchmark reports extraction accuracy, per-rule decisions, PASS/FAIL precisi
 
 ## Known limitations
 
-- This remains a local prototype without authentication, database-backed inspection history, admin functions, or PDF export.
+- Role-specific reviewer/admin workflows and a full persistent-history UI are the next database phase; the schema and RLS foundation are already in place.
 - PaddleOCR first-request initialization is slower than subsequent analyses.
 - Analysis is synchronous from the browser's perspective; pipeline stages are a UI representation, not server-sent progress.
 - Physical numeral-height evidence remains `REVIEW` until independently validated.
