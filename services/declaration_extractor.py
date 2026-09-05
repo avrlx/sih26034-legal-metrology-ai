@@ -76,10 +76,12 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
         inline = MRP_LABEL.sub("", label["text"], count=1)
         match = PRICE.search(inline)
         if match and not UNIT_PRICE.search(inline) and "%" not in inline:
-            return {"currency": "INR", "value": float(match.group(1)), "inclusive_of_all_taxes": bool(re.search(r"(?:INCLUSIVE|INCL\.?\s*OF)\s+ALL\s+TAXES", label["text"], re.I)), **_ev(label, "explicit_mrp_label")}
+            amount = float(match.group(1))
+            if amount > 0:
+                return {"currency": "INR", "value": amount, "inclusive_of_all_taxes": bool(re.search(r"(?:INCLUSIVE|INCL\.?\s*OF)\s+ALL\s+TAXES", label["text"], re.I)), **_ev(label, "explicit_mrp_label")}
 
         candidates = []
-        for distance in range(1, 7):
+        for distance in range(1, 8):
             for j in (i - distance, i + distance):
                 if not 0 <= j < len(items):
                     continue
@@ -92,12 +94,19 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
                 match = PRICE.fullmatch(text) or PRICE.search(text)
                 if not match:
                     continue
+                amount = float(match.group(1))
+                # A retail sale price of zero is not a valid candidate. OCR pipelines
+                # can emit zero-valued decoys from punctuation/noise; keep them out
+                # of the MRP decision instead of allowing a nearby 0.0 to win.
+                if amount <= 0:
+                    continue
                 score = 100 - distance * 12 + candidate["confidence"] * 10
                 if j == i - 1: score += 18
                 if j == i + 1: score += 14
                 if re.search(r"₹|\bRS\.?\b|\bINR\b|/-", text, re.I): score += 25
                 if re.fullmatch(r"\d{1,6}(?:\.\d{1,2})?", text): score += 8
-                candidates.append((score, candidate, float(match.group(1))))
+                if re.fullmatch(r"\d{1,6}\.\d{2}", text): score += 6
+                candidates.append((score, candidate, amount))
         if candidates:
             _, candidate, amount = max(candidates, key=lambda x: x[0])
             return {"currency": "INR", "value": amount, "inclusive_of_all_taxes": False, "label_text": label["raw_text"], "label_box": label.get("box"), **_ev(candidate, "explicit_mrp_label_adjacent_amount")}
