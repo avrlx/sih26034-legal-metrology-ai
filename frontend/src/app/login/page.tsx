@@ -1,28 +1,29 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ShieldCheck, LoaderCircle } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [redirectPath, setRedirectPath] = useState("/");
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(
-    searchParams.get("error") === "auth_callback_failed"
-      ? "Email verification could not be completed. Please try again."
-      : null,
-  );
+  const [error, setError] = useState<string | null>(null);
 
-  const next = searchParams.get("next");
-  const redirectPath = next && next.startsWith("/") ? next : "/";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next?.startsWith("/")) setRedirectPath(next);
+    if (params.get("error") === "auth_callback_failed") {
+      setError("Email verification could not be completed. Please try again.");
+    }
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
