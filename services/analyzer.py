@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from batch_measure import process_image
-from reporting.report import add_enhanced_report_fields, build_package_report
-from services.declaration_extractor import enhance_extracted_fields
+from reporting.report import build_package_report
+from services.declaration_extractor import add_enhanced_report_fields, enhance_extracted_fields
 from services.evidence import build_evidence_images, scrub_local_paths
 from services.mrp_extractor import correct_mrp
 from services.report_mapping import merge_enhanced_fields
