@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { LogOut, UserCircle2 } from "lucide-react";
 
@@ -42,6 +43,13 @@ export function AuthUserMenu() {
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Signed in as</p>
             <p className="mt-1 truncate text-sm font-medium text-slate-800">{email}</p>
           </div>
+          <Link
+            href="/account"
+            onClick={() => setOpen(false)}
+            className="mb-1 block rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Account & profile
+          </Link>
           <form action="/auth/signout" method="post">
             <button
               type="submit"
