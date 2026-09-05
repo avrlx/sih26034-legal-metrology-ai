@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from batch_measure import process_image
-from reporting.report import build_package_report
-from services.declaration_extractor import add_enhanced_report_fields, enhance_extracted_fields
+from reporting.report import add_enhanced_report_fields, build_package_report
+from services.declaration_extractor import enhance_extracted_fields
 from services.evidence import build_evidence_images, scrub_local_paths
+from services.mrp_extractor import correct_mrp
 from services.report_mapping import merge_enhanced_fields
 
 
@@ -93,6 +94,9 @@ class PackageAnalyzer:
             safe_result["extracted_fields"] = enhance_extracted_fields(
                 safe_result.get("extracted_fields") or {}
             )
+            # MRP is particularly vulnerable to nearby nutrition/unit-price OCR
+            # noise. Re-rank candidates using the MRP label's spatial context.
+            safe_result["extracted_fields"] = correct_mrp(safe_result["extracted_fields"])
 
             # Feed measured engineering evidence into the deterministic Rule 7
             # validator. The principal display-panel area is intentionally not
