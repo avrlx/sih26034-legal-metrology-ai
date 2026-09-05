@@ -9,8 +9,9 @@ from typing import Any, Callable
 
 from batch_measure import process_image
 from reporting.report import build_package_report
-from services.declaration_extractor import add_enhanced_report_fields, enhance_extracted_fields
+from services.declaration_extractor import enhance_extracted_fields
 from services.evidence import build_evidence_images, scrub_local_paths
+from services.report_mapping import merge_enhanced_fields
 
 
 class PackageAnalysisError(RuntimeError):
@@ -109,7 +110,8 @@ class PackageAnalyzer:
             safe_result["extracted_fields"] = extracted_fields
 
             report = self._report_builder(safe_result)
-            return add_enhanced_report_fields(report, safe_result["extracted_fields"])
+            report = add_enhanced_report_fields(report, safe_result["extracted_fields"])
+            return merge_enhanced_fields(report, safe_result["extracted_fields"])
         except PackageAnalysisError:
             raise
         except Exception as exc:
