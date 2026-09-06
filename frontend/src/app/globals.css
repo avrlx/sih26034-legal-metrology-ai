@@ -55,6 +55,27 @@
   --radius: 0.65rem;
 }
 
+.dark {
+  --background: oklch(0.16 0.025 235);
+  --foreground: oklch(0.93 0.012 225);
+  --card: oklch(0.205 0.028 235);
+  --card-foreground: oklch(0.93 0.012 225);
+  --popover: oklch(0.19 0.03 235);
+  --popover-foreground: oklch(0.93 0.012 225);
+  --primary: oklch(0.72 0.105 215);
+  --primary-foreground: oklch(0.16 0.025 235);
+  --secondary: oklch(0.27 0.035 235);
+  --secondary-foreground: oklch(0.92 0.015 225);
+  --muted: oklch(0.25 0.03 235);
+  --muted-foreground: oklch(0.68 0.025 225);
+  --accent: oklch(0.72 0.12 78);
+  --accent-foreground: oklch(0.2 0.04 62);
+  --destructive: oklch(0.64 0.19 25);
+  --border: oklch(0.34 0.035 235);
+  --input: oklch(0.34 0.035 235);
+  --ring: oklch(0.68 0.09 215);
+}
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { @apply font-sans; }
@@ -65,8 +86,34 @@
       linear-gradient(to bottom, oklch(0.88 0.015 225 / 0.26) 1px, transparent 1px);
     background-size: 32px 32px;
   }
+  .dark body {
+    background-image:
+      linear-gradient(to right, oklch(0.28 0.025 235 / 0.32) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.28 0.025 235 / 0.32) 1px, transparent 1px);
+  }
   button, [role="button"] { cursor: pointer; }
 }
+
+/* The existing dashboard uses a mixture of Tailwind utility colors and the
+   shadcn design tokens. These small overrides keep those legacy utilities
+   readable when dark mode is enabled without requiring a risky page-by-page
+   restyle. */
+.dark .bg-white { background-color: var(--card) !important; }
+.dark .bg-white\/95 { background-color: color-mix(in oklab, var(--card) 95%, transparent) !important; }
+.dark .bg-slate-50, .dark .bg-slate-50\/70 { background-color: oklch(0.22 0.028 235) !important; }
+.dark .bg-slate-100 { background-color: oklch(0.25 0.03 235) !important; }
+.dark .text-slate-950, .dark .text-slate-900 { color: oklch(0.94 0.012 225) !important; }
+.dark .text-slate-800 { color: oklch(0.88 0.015 225) !important; }
+.dark .text-slate-700 { color: oklch(0.8 0.018 225) !important; }
+.dark .text-slate-600 { color: oklch(0.73 0.02 225) !important; }
+.dark .text-slate-500 { color: oklch(0.65 0.022 225) !important; }
+.dark .text-slate-400 { color: oklch(0.55 0.02 225) !important; }
+.dark .border-slate-100 { border-color: oklch(0.3 0.03 235) !important; }
+.dark .border-slate-200 { border-color: oklch(0.34 0.035 235) !important; }
+.dark .border-slate-300 { border-color: oklch(0.4 0.035 235) !important; }
+.dark .hover\:bg-slate-50:hover { background-color: oklch(0.26 0.03 235) !important; }
+.dark .hover\:bg-slate-100:hover { background-color: oklch(0.29 0.032 235) !important; }
+.dark .placeholder\:text-slate-400::placeholder { color: oklch(0.55 0.02 225) !important; }
 
 @keyframes scan-line {
   from { transform: translateY(-100%); }
