@@ -33,7 +33,10 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
     print("\n========== ARUCO CALIBRATION ==========\n")
     print(json.dumps(calibration, indent=2))
 
-    ocr = PaddleOCR(lang="en")
+    ocr = PaddleOCR(
+        lang="en",
+        enable_mkldnn=False,
+    )
     raw_ocr_items = predict_ocr_items(ocr, image_path)
     recovered_ocr_items, recovery = recover_split_quantity_items(
         image_path, raw_ocr_items, ocr
@@ -78,6 +81,7 @@ def run_pipeline(image_path=IMAGE_PATH, marker_size_mm=MARKER_SIZE_MM):
             debug=True,
         )
         net_qty["glyph_measurement"] = glyph_measurement
+        fields["font_height_measurement"] = glyph_measurement
 
     contrast_targets = {
         target: measure_local_contrast(

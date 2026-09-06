@@ -1,4 +1,5 @@
 import type { CanonicalReport, HealthResponse } from "@/types/report";
+import { saveInspection } from "@/services/inspections";
 
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -77,6 +78,8 @@ export async function analyzePackage(file: File): Promise<CanonicalReport> {
   if (!isCanonicalReport(body)) {
     throw new ApiError("The service returned an invalid canonical report.");
   }
+
+  await saveInspection(body, file);
   return body;
 }
 

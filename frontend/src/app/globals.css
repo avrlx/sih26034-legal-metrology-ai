@@ -16,6 +16,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -55,6 +56,27 @@
   --radius: 0.65rem;
 }
 
+.dark {
+  --background: oklch(0.16 0.025 235);
+  --foreground: oklch(0.93 0.012 225);
+  --card: oklch(0.205 0.028 235);
+  --card-foreground: oklch(0.93 0.012 225);
+  --popover: oklch(0.19 0.03 235);
+  --popover-foreground: oklch(0.93 0.012 225);
+  --primary: oklch(0.72 0.105 215);
+  --primary-foreground: oklch(0.16 0.025 235);
+  --secondary: oklch(0.27 0.035 235);
+  --secondary-foreground: oklch(0.92 0.015 225);
+  --muted: oklch(0.25 0.03 235);
+  --muted-foreground: oklch(0.68 0.025 225);
+  --accent: oklch(0.72 0.12 78);
+  --accent-foreground: oklch(0.2 0.04 62);
+  --destructive: oklch(0.64 0.19 25);
+  --border: oklch(0.34 0.035 235);
+  --input: oklch(0.34 0.035 235);
+  --ring: oklch(0.68 0.09 215);
+}
+
 @layer base {
   * { @apply border-border outline-ring/50; }
   html { @apply font-sans; }
@@ -65,7 +87,130 @@
       linear-gradient(to bottom, oklch(0.88 0.015 225 / 0.26) 1px, transparent 1px);
     background-size: 32px 32px;
   }
+  .dark body {
+    background-image:
+      linear-gradient(to right, oklch(0.28 0.025 235 / 0.32) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.28 0.025 235 / 0.32) 1px, transparent 1px);
+  }
   button, [role="button"] { cursor: pointer; }
+}
+
+/* Compatibility layer for the existing dashboard's hard-coded utility colors. */
+.dark .bg-white { background-color: var(--card) !important; }
+.dark .bg-white\/95 { background-color: color-mix(in oklab, var(--card) 95%, transparent) !important; }
+.dark .bg-slate-50, .dark .bg-slate-50\/70 { background-color: oklch(0.22 0.028 235) !important; }
+.dark .bg-slate-100 { background-color: oklch(0.25 0.03 235) !important; }
+.dark .bg-sky-50, .dark .bg-sky-50\/50, .dark .bg-sky-50\/70 { background-color: oklch(0.22 0.045 230) !important; }
+.dark .bg-emerald-50 { background-color: oklch(0.22 0.045 155) !important; }
+.dark .bg-amber-50 { background-color: oklch(0.23 0.055 80) !important; }
+.dark .bg-rose-50 { background-color: oklch(0.23 0.055 20) !important; }
+.dark .text-slate-950, .dark .text-slate-900 { color: oklch(0.94 0.012 225) !important; }
+.dark .text-slate-800 { color: oklch(0.88 0.015 225) !important; }
+.dark .text-slate-700 { color: oklch(0.8 0.018 225) !important; }
+.dark .text-slate-600 { color: oklch(0.73 0.02 225) !important; }
+.dark .text-slate-500 { color: oklch(0.65 0.022 225) !important; }
+.dark .text-slate-400 { color: oklch(0.55 0.02 225) !important; }
+.dark .text-sky-900, .dark .text-sky-800 { color: oklch(0.8 0.09 215) !important; }
+.dark .text-emerald-900, .dark .text-emerald-800 { color: oklch(0.8 0.12 155) !important; }
+.dark .text-rose-900, .dark .text-rose-800 { color: oklch(0.82 0.11 20) !important; }
+.dark .text-amber-900, .dark .text-amber-800 { color: oklch(0.84 0.12 80) !important; }
+
+/* High-contrast fixes for Tailwind's deeper semantic text and opacity utilities. */
+.dark [class~="text-amber-950"] { color: oklch(0.88 0.12 82) !important; }
+.dark [class~="text-amber-900/80"] { color: oklch(0.88 0.12 82) !important; }
+.dark [class~="text-amber-900/70"] { color: oklch(0.86 0.11 82) !important; }
+.dark [class~="text-rose-950"] { color: oklch(0.9 0.1 20) !important; }
+.dark [class~="text-rose-900/80"] { color: oklch(0.88 0.1 20) !important; }
+.dark [class~="text-emerald-950"] { color: oklch(0.88 0.12 155) !important; }
+.dark [class~="text-emerald-900/80"] { color: oklch(0.86 0.11 155) !important; }
+.dark [class~="text-sky-950"] { color: oklch(0.88 0.09 215) !important; }
+.dark [class~="text-sky-900/80"] { color: oklch(0.86 0.08 215) !important; }
+.dark [class~="text-slate-950/80"] { color: oklch(0.92 0.012 225) !important; }
+.dark [class~="text-slate-900/80"] { color: oklch(0.9 0.012 225) !important; }
+.dark [class~="text-slate-700/80"] { color: oklch(0.82 0.018 225) !important; }
+
+/* Explicitly theme opacity backgrounds used by the dashboard banners. */
+.dark [class~="bg-sky-50/60"] {
+  background: oklch(0.21 0.055 225) !important;
+  border-color: oklch(0.58 0.14 215) !important;
+  color: oklch(0.94 0.012 225) !important;
+}
+.dark [class~="bg-sky-50/60"] [class~="text-sky-950"] {
+  color: oklch(0.86 0.12 215) !important;
+}
+.dark [class~="bg-sky-50/60"] [class~="text-slate-600"] {
+  color: oklch(0.84 0.018 225) !important;
+}
+.dark [class~="bg-sky-50/60"] button {
+  background-color: oklch(0.22 0.045 235) !important;
+  color: oklch(0.93 0.012 225) !important;
+  border-color: oklch(0.55 0.12 215) !important;
+}
+.dark [class~="bg-sky-50/60"] button:hover {
+  background-color: oklch(0.28 0.06 230) !important;
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark [class~="bg-sky-50/50"],
+.dark [class~="bg-sky-50/70"] {
+  background-color: oklch(0.22 0.045 230) !important;
+}
+
+.dark .border-slate-100 { border-color: oklch(0.3 0.03 235) !important; }
+.dark .border-slate-200 { border-color: oklch(0.34 0.035 235) !important; }
+.dark .border-slate-300 { border-color: oklch(0.4 0.035 235) !important; }
+.dark .border-sky-100, .dark .border-sky-200 { border-color: oklch(0.38 0.06 225) !important; }
+.dark .border-emerald-200 { border-color: oklch(0.4 0.08 155) !important; }
+.dark .border-amber-200 { border-color: oklch(0.42 0.09 80) !important; }
+.dark .border-rose-200 { border-color: oklch(0.42 0.08 20) !important; }
+.dark .hover\:bg-slate-50:hover { background-color: oklch(0.26 0.03 235) !important; }
+.dark .hover\:bg-slate-100:hover { background-color: oklch(0.29 0.032 235) !important; }
+.dark .placeholder\:text-slate-400::placeholder { color: oklch(0.55 0.02 225) !important; }
+
+/* Dark-mode navigation: keep the left rail bright, calm, and readable. */
+.dark aside {
+  background-color: oklch(0.205 0.045 228) !important;
+  border-color: oklch(0.34 0.045 228) !important;
+  color: oklch(0.94 0.012 225) !important;
+}
+.dark aside a,
+.dark aside button {
+  color: oklch(0.9 0.018 225) !important;
+}
+.dark aside a:hover,
+.dark aside button:hover {
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark aside .text-slate-400,
+.dark aside .text-slate-500,
+.dark aside .text-slate-600,
+.dark aside .text-slate-700 {
+  color: oklch(0.82 0.02 225) !important;
+}
+.dark aside .text-sky-300,
+.dark aside .text-sky-400,
+.dark aside .text-sky-500,
+.dark aside .text-sky-600,
+.dark aside .text-cyan-300,
+.dark aside .text-cyan-400 {
+  color: oklch(0.78 0.105 215) !important;
+}
+.dark aside .bg-slate-900,
+.dark aside .bg-slate-950,
+.dark aside .bg-black\/10,
+.dark aside .bg-black\/20 {
+  background-color: oklch(0.145 0.035 230) !important;
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark aside .hover\:bg-slate-900:hover,
+.dark aside .hover\:bg-slate-950:hover {
+  background-color: oklch(0.25 0.045 228) !important;
+}
+.dark aside svg {
+  color: currentColor;
+}
+.dark aside hr,
+.dark aside [class*="border"] {
+  border-color: oklch(0.34 0.045 228) !important;
 }
 
 @keyframes scan-line {
