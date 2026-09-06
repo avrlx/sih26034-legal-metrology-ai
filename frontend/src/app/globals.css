@@ -113,6 +113,21 @@
 .dark .text-emerald-900, .dark .text-emerald-800 { color: oklch(0.8 0.12 155) !important; }
 .dark .text-rose-900, .dark .text-rose-800 { color: oklch(0.82 0.11 20) !important; }
 .dark .text-amber-900, .dark .text-amber-800 { color: oklch(0.84 0.12 80) !important; }
+
+/* High-contrast fixes for Tailwind's deeper semantic text and opacity utilities. */
+.dark [class~="text-amber-950"] { color: oklch(0.88 0.12 82) !important; }
+.dark [class~="text-amber-900/80"] { color: oklch(0.88 0.12 82) !important; }
+.dark [class~="text-amber-900/70"] { color: oklch(0.86 0.11 82) !important; }
+.dark [class~="text-rose-950"] { color: oklch(0.9 0.1 20) !important; }
+.dark [class~="text-rose-900/80"] { color: oklch(0.88 0.1 20) !important; }
+.dark [class~="text-emerald-950"] { color: oklch(0.88 0.12 155) !important; }
+.dark [class~="text-emerald-900/80"] { color: oklch(0.86 0.11 155) !important; }
+.dark [class~="text-sky-950"] { color: oklch(0.88 0.09 215) !important; }
+.dark [class~="text-sky-900/80"] { color: oklch(0.86 0.08 215) !important; }
+.dark [class~="text-slate-950/80"] { color: oklch(0.92 0.012 225) !important; }
+.dark [class~="text-slate-900/80"] { color: oklch(0.9 0.012 225) !important; }
+.dark [class~="text-slate-700/80"] { color: oklch(0.82 0.018 225) !important; }
+
 .dark .border-slate-100 { border-color: oklch(0.3 0.03 235) !important; }
 .dark .border-slate-200 { border-color: oklch(0.34 0.035 235) !important; }
 .dark .border-slate-300 { border-color: oklch(0.4 0.035 235) !important; }
