@@ -124,6 +124,53 @@
 .dark .hover\:bg-slate-100:hover { background-color: oklch(0.29 0.032 235) !important; }
 .dark .placeholder\:text-slate-400::placeholder { color: oklch(0.55 0.02 225) !important; }
 
+/* Dark-mode navigation: keep the left rail bright, calm, and readable. */
+.dark aside {
+  background-color: oklch(0.205 0.045 228) !important;
+  border-color: oklch(0.34 0.045 228) !important;
+  color: oklch(0.94 0.012 225) !important;
+}
+.dark aside a,
+.dark aside button {
+  color: oklch(0.9 0.018 225) !important;
+}
+.dark aside a:hover,
+.dark aside button:hover {
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark aside .text-slate-400,
+.dark aside .text-slate-500,
+.dark aside .text-slate-600,
+.dark aside .text-slate-700 {
+  color: oklch(0.82 0.02 225) !important;
+}
+.dark aside .text-sky-300,
+.dark aside .text-sky-400,
+.dark aside .text-sky-500,
+.dark aside .text-sky-600,
+.dark aside .text-cyan-300,
+.dark aside .text-cyan-400 {
+  color: oklch(0.78 0.105 215) !important;
+}
+.dark aside .bg-slate-900,
+.dark aside .bg-slate-950,
+.dark aside .bg-black\/10,
+.dark aside .bg-black\/20 {
+  background-color: oklch(0.145 0.035 230) !important;
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark aside .hover\:bg-slate-900:hover,
+.dark aside .hover\:bg-slate-950:hover {
+  background-color: oklch(0.25 0.045 228) !important;
+}
+.dark aside svg {
+  color: currentColor;
+}
+.dark aside hr,
+.dark aside [class*="border"] {
+  border-color: oklch(0.34 0.045 228) !important;
+}
+
 @keyframes scan-line {
   from { transform: translateY(-100%); }
   to { transform: translateY(420%); }
