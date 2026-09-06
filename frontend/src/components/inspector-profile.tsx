@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LoaderCircle, ShieldCheck, UserCircle2, X } from "lucide-react";
+import { LoaderCircle, LogOut, ShieldCheck, UserCircle2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ export function InspectorProfile() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -151,6 +152,20 @@ export function InspectorProfile() {
     }
   }
 
+  async function signOut() {
+    setSigningOut(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) throw signOutError;
+      window.location.assign("/login");
+    } catch (signOutError) {
+      setError(signOutError instanceof Error ? signOutError.message : "Could not sign out.");
+      setSigningOut(false);
+    }
+  }
+
   return (
     <>
       <button
@@ -227,6 +242,18 @@ export function InspectorProfile() {
 
                   {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-800">{error}</p>}
                   {message && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">{message}</p>}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={signingOut}
+                    onClick={() => void signOut()}
+                    className="w-full border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                  >
+                    {signingOut && <LoaderCircle className="mr-2 size-4 animate-spin" />}
+                    {!signingOut && <LogOut className="mr-2 size-4" />}
+                    {signingOut ? "Signing out…" : "Sign out"}
+                  </Button>
                 </>
               )}
             </CardContent>
