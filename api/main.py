@@ -70,6 +70,18 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
         allow_headers=["Content-Type"],
     )
 
+    @app.on_event("startup")
+    async def warm_ocr_model() -> None:
+        """Load OCR before the demo starts so the first upload is not penalized."""
+        try:
+            LOGGER.info("Loading PaddleOCR model during API startup...")
+            await run_in_threadpool(app.state.analyzer.warm_up)
+            LOGGER.info("PaddleOCR model ready; inspection requests are warm")
+        except Exception:
+            # Do not prevent the API from starting; the first request can still
+            # initialize the analyzer lazily and surface a normal analysis error.
+            LOGGER.exception("PaddleOCR warm-up failed; lazy initialization remains enabled")
+
     @app.get("/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
         return HealthResponse(status="ok", service=SERVICE_NAME)
