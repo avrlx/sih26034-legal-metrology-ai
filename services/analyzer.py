@@ -21,17 +21,23 @@ class PackageAnalysisError(RuntimeError):
     """Raised when a technical failure prevents report generation."""
 
 
-# These are the high-priority declaration checks in the prototype rule table.
-# Rule 7 (font height) and Rule 9 (contrast) are supplementary visual/engineering
-# checks and should not turn an otherwise complete declaration set into FAIL.
 CORE_DECLARATION_RULES = {
-    "LM-R6-001",  # manufacturer
-    "LM-R6-005",  # commodity name
-    "LM-R6-006",  # net quantity
-    "LM-R6-007",  # month/year
-    "LM-R6-008",  # MRP
-    "LM-R6-010",  # consumer care
+    "LM-R6-001",
+    "LM-R6-005",
+    "LM-R6-006",
+    "LM-R6-007",
+    "LM-R6-008",
+    "LM-R6-010",
 }
+
+CORE_FIELDS = (
+    "manufacturer",
+    "product",
+    "net_quantity",
+    "manufacture_date",
+    "mrp",
+    "consumer_care",
+)
 
 
 def _default_ocr_factory() -> Any:
@@ -46,8 +52,33 @@ def _default_ocr_factory() -> Any:
 def _confidence(value: Any) -> float:
     if not isinstance(value, dict):
         return -1.0
-    raw = value.get("confidence", value.get("extraction_confidence"))
+    raw = value.get("confidence", value.get("extraction_confidence", value.get("ocr_confidence")))
     return float(raw) if isinstance(raw, (int, float)) else -1.0
+
+
+def _has_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, dict):
+        if value.get("present") is False:
+            return False
+        normalized = value.get("normalized_value", value.get("value", value.get("raw")))
+        if isinstance(normalized, dict):
+            return any(item not in (None, "", [], {}) for item in normalized.values())
+        return normalized not in (None, "", [], {})
+    return value not in (None, "", [], {})
+
+
+def _needs_ocr_verification(fields: dict[str, Any]) -> bool:
+    """Run the expensive contrast OCR only when primary extraction needs help."""
+    missing_or_weak = 0
+    for name in CORE_FIELDS:
+        value = fields.get(name)
+        if not _has_value(value) or _confidence(value) < 0.82:
+            missing_or_weak += 1
+    # Good, clean packages take the fast path. Ambiguous packages get one
+    # contrast verification pass so accuracy is improved where it matters.
+    return missing_or_weak > 0
 
 
 def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -> dict[str, Any]:
@@ -65,14 +96,7 @@ def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -
 
 
 def _apply_core_status_policy(report: dict[str, Any]) -> dict[str, Any]:
-    """Keep the headline status focused on mandatory declaration compliance.
-
-    Visual engineering checks remain visible as REVIEW at rule level. They are
-    deliberately not allowed to downgrade a package whose high-priority Rule 6
-    declarations are all conclusively compliant. A definitive core FAIL still
-    always wins. This makes the dashboard reflect declaration compliance rather
-    than image-measurement availability.
-    """
+    """Keep the headline status focused on mandatory declaration compliance."""
     results = report.get("rule_results") or []
     core = [item for item in results if item.get("rule_id") in CORE_DECLARATION_RULES]
     if not core:
@@ -99,12 +123,7 @@ def _apply_core_status_policy(report: dict[str, Any]) -> dict[str, Any]:
 
 
 class PackageAnalyzer:
-    """Reuse one OCR model and the existing single-image processing function.
-
-    Paddle inference is serialized by a lock because thread safety is not
-    assumed for the shared prototype model. OpenCV/report generation remains
-    request-local, and no report or debug artifact is written by this service.
-    """
+    """Reuse one OCR model and the existing single-image processing function."""
 
     def __init__(
         self,
@@ -151,11 +170,34 @@ class PackageAnalyzer:
                         ocr,
                         debug_path=glyph_debug_path,
                     )
-                    # A single OCR pass is fast but can be brittle on glare,
-                    # textured packaging and small declaration text. Re-read the
-                    # same image through two conservative visual variants and use
-                    # consensus only when text and geometry agree.
-                    ensemble_items, ensemble_meta = run_ocr_ensemble(ocr, str(path))
+
+                    # Improve semantic field selection before deciding whether a
+                    # second OCR view is actually necessary. Most clear packages
+                    # now take one OCR pass; difficult packages get one CLAHE pass.
+                    primary_fields = enhance_extracted_fields(
+                        batch_result.get("extracted_fields") or {}
+                    )
+                    primary_fields = correct_mrp(primary_fields)
+                    batch_result["extracted_fields"] = primary_fields
+
+                    if _needs_ocr_verification(primary_fields):
+                        primary_items = primary_fields.get("ocr_evidence") or []
+                        ensemble_items, ensemble_meta = run_ocr_ensemble(
+                            ocr,
+                            str(path),
+                            primary_items=primary_items,
+                        )
+                    else:
+                        ensemble_items = []
+                        ensemble_meta = {
+                            "passes": 1,
+                            "raw_items": len(primary_fields.get("ocr_evidence") or []),
+                            "consensus_items": 0,
+                            "errors": [],
+                            "skipped": True,
+                            "reason": "primary_declarations_sufficient",
+                        }
+
                 if batch_result.get("failure_stage") == "unexpected_exception":
                     raise PackageAnalysisError("The analysis pipeline failed unexpectedly")
                 evidence_images = self._evidence_builder(path, batch_result, evidence_root)
@@ -164,9 +206,6 @@ class PackageAnalyzer:
             safe_result["image"] = Path(display_filename).name
             safe_result.setdefault("ocr", {})["ensemble"] = ensemble_meta
 
-            # Use the multi-view OCR as a second extraction source. It does not
-            # blindly overwrite the first pass; each declaration keeps whichever
-            # candidate has the stronger evidence score.
             if ensemble_items:
                 ensemble_fields = enhance_extracted_fields(extract_fields(ensemble_items))
                 ensemble_fields = correct_mrp(ensemble_fields)
@@ -174,18 +213,11 @@ class PackageAnalyzer:
                     safe_result.get("extracted_fields") or {}, ensemble_fields
                 )
 
-            # OCR can detect a declaration correctly while the generic field
-            # extractor chooses the wrong nearby numeric/text candidate. Run a
-            # deterministic semantic pass over the OCR evidence before the
-            # canonical report and rule engine consume the fields.
             safe_result["extracted_fields"] = enhance_extracted_fields(
                 safe_result.get("extracted_fields") or {}
             )
             safe_result["extracted_fields"] = correct_mrp(safe_result["extracted_fields"])
 
-            # Feed measured engineering evidence into the deterministic Rule 7
-            # validator. The principal display-panel area is intentionally not
-            # guessed: if it is unavailable, Rule 7 remains REVIEW.
             extracted_fields = dict(safe_result.get("extracted_fields") or {})
             extracted_fields["font_height_measurement"] = safe_result.get("glyph_measurement")
             if safe_result.get("principal_display_panel_area_cm2") is not None:
