@@ -21,6 +21,19 @@ class PackageAnalysisError(RuntimeError):
     """Raised when a technical failure prevents report generation."""
 
 
+# These are the high-priority declaration checks in the prototype rule table.
+# Rule 7 (font height) and Rule 9 (contrast) are supplementary visual/engineering
+# checks and should not turn an otherwise complete declaration set into FAIL.
+CORE_DECLARATION_RULES = {
+    "LM-R6-001",  # manufacturer
+    "LM-R6-005",  # commodity name
+    "LM-R6-006",  # net quantity
+    "LM-R6-007",  # month/year
+    "LM-R6-008",  # MRP
+    "LM-R6-010",  # consumer care
+}
+
+
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
@@ -49,6 +62,40 @@ def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -
     if ensemble.get("ocr_evidence"):
         merged["ocr_evidence"] = ensemble["ocr_evidence"]
     return merged
+
+
+def _apply_core_status_policy(report: dict[str, Any]) -> dict[str, Any]:
+    """Keep the headline status focused on mandatory declaration compliance.
+
+    Visual engineering checks remain visible as REVIEW at rule level. They are
+    deliberately not allowed to downgrade a package whose high-priority Rule 6
+    declarations are all conclusively compliant. A definitive core FAIL still
+    always wins. This makes the dashboard reflect declaration compliance rather
+    than image-measurement availability.
+    """
+    results = report.get("rule_results") or []
+    core = [item for item in results if item.get("rule_id") in CORE_DECLARATION_RULES]
+    if not core:
+        return report
+
+    core_fail = [item for item in core if item.get("status") == "FAIL"]
+    core_review = [item for item in core if item.get("status") == "REVIEW"]
+    if core_fail:
+        status = "FAIL"
+        reason = "At least one mandatory declaration check has a definitive FAIL result"
+    elif core_review:
+        status = "REVIEW"
+        reason = "One or more mandatory declaration checks still require verification"
+    else:
+        status = "PASS"
+        reason = "All mandatory declaration checks passed; supplementary visual checks are reported separately"
+
+    summary = report.setdefault("summary", {})
+    summary["overall_status"] = status
+    summary["core_declaration_status"] = status
+    summary["core_declaration_reason"] = reason
+    summary["status_scope"] = "mandatory_declarations"
+    return report
 
 
 class PackageAnalyzer:
@@ -153,7 +200,8 @@ class PackageAnalyzer:
 
             report = self._report_builder(safe_result)
             report = add_enhanced_report_fields(report, safe_result["extracted_fields"])
-            return merge_enhanced_fields(report, safe_result["extracted_fields"])
+            report = merge_enhanced_fields(report, safe_result["extracted_fields"])
+            return _apply_core_status_policy(report)
         except PackageAnalysisError:
             raise
         except Exception as exc:
