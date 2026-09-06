@@ -7,10 +7,10 @@ describe("API service", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("checks backend health once through the configured endpoint", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "ok", service: "PackSure" }), { status: 200 }));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ status: "ok", service: "ComplyVision" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(checkHealth()).resolves.toEqual({ status: "ok", service: "PackSure" });
+    await expect(checkHealth()).resolves.toEqual({ status: "ok", service: "ComplyVision" });
     expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:8000/health", { method: "GET" });
   });
 
