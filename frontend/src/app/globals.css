@@ -94,23 +94,32 @@
   button, [role="button"] { cursor: pointer; }
 }
 
-/* The existing dashboard uses a mixture of Tailwind utility colors and the
-   shadcn design tokens. These small overrides keep those legacy utilities
-   readable when dark mode is enabled without requiring a risky page-by-page
-   restyle. */
+/* Compatibility layer for the existing dashboard's hard-coded utility colors. */
 .dark .bg-white { background-color: var(--card) !important; }
 .dark .bg-white\/95 { background-color: color-mix(in oklab, var(--card) 95%, transparent) !important; }
 .dark .bg-slate-50, .dark .bg-slate-50\/70 { background-color: oklch(0.22 0.028 235) !important; }
 .dark .bg-slate-100 { background-color: oklch(0.25 0.03 235) !important; }
+.dark .bg-sky-50, .dark .bg-sky-50\/50, .dark .bg-sky-50\/70 { background-color: oklch(0.22 0.045 230) !important; }
+.dark .bg-emerald-50 { background-color: oklch(0.22 0.045 155) !important; }
+.dark .bg-amber-50 { background-color: oklch(0.23 0.055 80) !important; }
+.dark .bg-rose-50 { background-color: oklch(0.23 0.055 20) !important; }
 .dark .text-slate-950, .dark .text-slate-900 { color: oklch(0.94 0.012 225) !important; }
 .dark .text-slate-800 { color: oklch(0.88 0.015 225) !important; }
 .dark .text-slate-700 { color: oklch(0.8 0.018 225) !important; }
 .dark .text-slate-600 { color: oklch(0.73 0.02 225) !important; }
 .dark .text-slate-500 { color: oklch(0.65 0.022 225) !important; }
 .dark .text-slate-400 { color: oklch(0.55 0.02 225) !important; }
+.dark .text-sky-900, .dark .text-sky-800 { color: oklch(0.8 0.09 215) !important; }
+.dark .text-emerald-900, .dark .text-emerald-800 { color: oklch(0.8 0.12 155) !important; }
+.dark .text-rose-900, .dark .text-rose-800 { color: oklch(0.82 0.11 20) !important; }
+.dark .text-amber-900, .dark .text-amber-800 { color: oklch(0.84 0.12 80) !important; }
 .dark .border-slate-100 { border-color: oklch(0.3 0.03 235) !important; }
 .dark .border-slate-200 { border-color: oklch(0.34 0.035 235) !important; }
 .dark .border-slate-300 { border-color: oklch(0.4 0.035 235) !important; }
+.dark .border-sky-100, .dark .border-sky-200 { border-color: oklch(0.38 0.06 225) !important; }
+.dark .border-emerald-200 { border-color: oklch(0.4 0.08 155) !important; }
+.dark .border-amber-200 { border-color: oklch(0.42 0.09 80) !important; }
+.dark .border-rose-200 { border-color: oklch(0.42 0.08 20) !important; }
 .dark .hover\:bg-slate-50:hover { background-color: oklch(0.26 0.03 235) !important; }
 .dark .hover\:bg-slate-100:hover { background-color: oklch(0.29 0.032 235) !important; }
 .dark .placeholder\:text-slate-400::placeholder { color: oklch(0.55 0.02 225) !important; }
