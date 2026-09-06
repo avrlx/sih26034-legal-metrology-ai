@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type IdentifierMode = "email" | "phone";
 type AuthMode = "login" | "signup";
-type Step = "credentials" | "primary-otp" | "secondary-otp";
+type Step = "credentials" | "primary-otp" | "secondary-contact" | "secondary-otp";
 
 function normalizePhone(value: string): string {
   return value.trim().replace(/[\s()-]/g, "");
@@ -27,9 +27,12 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
-  const [redirectPath, setRedirectPath] = useState("/");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const primaryValue = identifierMode === "email" ? email : phone;
+  const secondaryMode: IdentifierMode = identifierMode === "email" ? "phone" : "email";
+  const secondaryValue = secondaryMode === "email" ? email : phone;
 
   function resetFlow(nextMode: AuthMode, nextIdentifier = identifierMode) {
     setMode(nextMode);
@@ -42,39 +45,29 @@ export default function LoginPage() {
 
   async function sendPrimaryOtp() {
     const supabase = createClient();
-    const primaryPhone = normalizePhone(phone);
 
-    if (identifierMode === "email" && !email.trim()) {
-      throw new Error("Enter your email address.");
+    if (mode === "signup" && !fullName.trim()) {
+      throw new Error("Enter your full name.");
     }
-    if (identifierMode === "phone" && !validPhone(phone)) {
-      throw new Error("Enter a valid phone number in international format, for example +919876543210.");
-    }
-
-    if (mode === "signup") {
-      if (!fullName.trim()) throw new Error("Enter your full name.");
-      if (!email.trim()) throw new Error("Enter the email address that will be linked to this account.");
-      if (!validPhone(phone)) throw new Error("Enter a valid phone number in international format, for example +919876543210.");
-    }
-
-    const options = mode === "signup"
-      ? { shouldCreateUser: true, data: { full_name: fullName.trim() } }
-      : { shouldCreateUser: false };
 
     if (identifierMode === "email") {
+      if (!email.trim()) throw new Error("Enter your email address.");
       const { error: authError } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
-        options,
+        options: { shouldCreateUser: mode === "signup", data: mode === "signup" ? { full_name: fullName.trim() } : undefined },
       });
       if (authError) throw authError;
       setMessage(`We sent a one-time code to ${email.trim().toLowerCase()}.`);
     } else {
+      if (!validPhone(phone)) throw new Error("Enter a valid phone number in international format, for example +919876543210.");
+      const normalized = normalizePhone(phone);
       const { error: authError } = await supabase.auth.signInWithOtp({
-        phone: primaryPhone,
-        options,
+        phone: normalized,
+        options: { shouldCreateUser: mode === "signup", data: mode === "signup" ? { full_name: fullName.trim() } : undefined },
       });
       if (authError) throw authError;
-      setMessage(`We sent a one-time code to ${primaryPhone}.`);
+      setPhone(normalized);
+      setMessage(`We sent a one-time code to ${normalized}.`);
     }
 
     setStep("primary-otp");
@@ -102,27 +95,35 @@ export default function LoginPage() {
     }
 
     if (mode === "login") {
-      window.location.assign(redirectPath);
+      window.location.assign("/");
       return;
     }
 
-    const secondaryEmail = email.trim().toLowerCase();
-    const secondaryPhone = normalizePhone(phone);
-
-    if (identifierMode === "email") {
-      const { error: linkError } = await supabase.auth.updateUser({ phone: secondaryPhone });
-      if (linkError) throw linkError;
-      setOtp("");
-      setStep("secondary-otp");
-      setMessage(`Account created. Now verify the phone number ${secondaryPhone}.`);
-      return;
-    }
-
-    const { error: linkError } = await supabase.auth.updateUser({ email: secondaryEmail });
-    if (linkError) throw linkError;
     setOtp("");
+    setStep("secondary-contact");
+    setMessage(`Primary ${identifierMode} verified. Now add your ${secondaryMode} so the same account supports both login methods.`);
+  }
+
+  async function sendSecondaryOtp() {
+    const supabase = createClient();
+
+    if (secondaryMode === "phone") {
+      if (!validPhone(phone)) throw new Error("Enter a valid phone number in international format, for example +919876543210.");
+      const normalized = normalizePhone(phone);
+      const { error: authError } = await supabase.auth.updateUser({ phone: normalized });
+      if (authError) throw authError;
+      setPhone(normalized);
+      setMessage(`We sent a phone verification OTP to ${normalized}.`);
+    } else {
+      if (!email.trim()) throw new Error("Enter your email address.");
+      const normalized = email.trim().toLowerCase();
+      const { error: authError } = await supabase.auth.updateUser({ email: normalized });
+      if (authError) throw authError;
+      setEmail(normalized);
+      setMessage(`We sent an email verification OTP to ${normalized}.`);
+    }
+
     setStep("secondary-otp");
-    setMessage(`Account created. Now verify the email address ${secondaryEmail}.`);
   }
 
   async function verifySecondaryOtp() {
@@ -130,7 +131,7 @@ export default function LoginPage() {
     const token = otp.trim();
     if (!/^\d{6,8}$/.test(token)) throw new Error("Enter the OTP you received.");
 
-    if (identifierMode === "email") {
+    if (secondaryMode === "phone") {
       const { error: authError } = await supabase.auth.verifyOtp({
         phone: normalizePhone(phone),
         token,
@@ -146,7 +147,7 @@ export default function LoginPage() {
       if (authError) throw authError;
     }
 
-    window.location.assign(redirectPath);
+    window.location.assign("/");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -158,6 +159,7 @@ export default function LoginPage() {
     try {
       if (step === "credentials") await sendPrimaryOtp();
       else if (step === "primary-otp") await verifyPrimaryOtp();
+      else if (step === "secondary-contact") await sendSecondaryOtp();
       else await verifySecondaryOtp();
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Authentication failed.");
@@ -170,6 +172,8 @@ export default function LoginPage() {
     resetFlow(nextMode);
     setFullName("");
     setOtp("");
+    setEmail("");
+    setPhone("");
   }
 
   return (
@@ -186,7 +190,7 @@ export default function LoginPage() {
               {mode === "login" ? "Sign in to your workspace" : "Create your inspector account"}
             </h1>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              {step === "credentials" ? "Use an email or phone OTP. No password is required." : step === "primary-otp" ? "Enter the verification code we just sent." : "Verify your second contact method to finish linking the account."}
+              {step === "credentials" ? "Choose one sign-in method. Only that contact is shown." : step === "primary-otp" ? "Enter the verification code we just sent." : step === "secondary-contact" ? `Add your ${secondaryMode} to enable both login methods.` : `Enter the verification code sent to your ${secondaryMode}.`}
             </p>
           </div>
 
@@ -205,30 +209,50 @@ export default function LoginPage() {
               </label>
             )}
 
-            {step === "credentials" && (
-              <>
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-700">Email address</span>
-                  <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required={mode === "signup" || identifierMode === "email"} autoComplete="email" placeholder="inspector@example.com" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
-                  {mode === "signup" && <span className="mt-1 block text-xs text-slate-500">Required so every inspector account can support email login.</span>}
-                </label>
-
-                <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-700">Phone number</span>
-                  <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required={mode === "signup" || identifierMode === "phone"} autoComplete="tel" placeholder="+919876543210" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
-                  {mode === "signup" && <span className="mt-1 block text-xs text-slate-500">Use international format. Both email and phone are verified during registration.</span>}
-                </label>
-              </>
+            {step === "credentials" && identifierMode === "email" && (
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Email address</span>
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="inspector@example.com" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
+              </label>
             )}
 
-            {step !== "credentials" && (
+            {step === "credentials" && identifierMode === "phone" && (
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Phone number</span>
+                <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required autoComplete="tel" placeholder="+919876543210" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
+                <span className="mt-1 block text-xs text-slate-500">Use international format, e.g. +919876543210.</span>
+              </label>
+            )}
+
+            {step === "primary-otp" && (
               <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900">
-                <p className="font-semibold">{step === "primary-otp" ? "Primary verification" : "Second verification"}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-600">{step === "primary-otp" ? (identifierMode === "email" ? email : normalizePhone(phone)) : (identifierMode === "email" ? normalizePhone(phone) : email)}</p>
+                <p className="font-semibold">Primary verification</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{primaryValue}</p>
               </div>
             )}
 
-            {step !== "credentials" && (
+            {step === "secondary-contact" && secondaryMode === "phone" && (
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Phone number</span>
+                <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required autoComplete="tel" placeholder="+919876543210" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
+              </label>
+            )}
+
+            {step === "secondary-contact" && secondaryMode === "email" && (
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-700">Email address</span>
+                <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" placeholder="inspector@example.com" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
+              </label>
+            )}
+
+            {step === "secondary-otp" && (
+              <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm text-sky-900">
+                <p className="font-semibold">Second contact verification</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600">{secondaryValue}</p>
+              </div>
+            )}
+
+            {(step === "primary-otp" || step === "secondary-otp") && (
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-slate-700">One-time password</span>
                 <input value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" autoFocus required placeholder="Enter OTP" className="w-full rounded-lg border border-slate-300 px-3 py-3 text-center text-lg font-semibold tracking-[0.35em] outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100" />
@@ -240,12 +264,12 @@ export default function LoginPage() {
 
             <button type="submit" disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-900 disabled:cursor-not-allowed disabled:opacity-60">
               {busy && <LoaderCircle className="size-4 animate-spin" />}
-              {step === "credentials" ? (mode === "login" ? "Send OTP" : "Send registration OTP") : step === "primary-otp" ? "Verify OTP" : "Verify and finish"}
+              {step === "credentials" ? (mode === "login" ? "Send OTP" : "Send registration OTP") : step === "primary-otp" ? "Verify OTP" : step === "secondary-contact" ? `Send ${secondaryMode === "email" ? "email" : "phone"} OTP` : "Verify and finish"}
             </button>
 
             {step !== "credentials" && (
               <button type="button" className="w-full text-center text-sm font-semibold text-sky-800 hover:text-sky-950" onClick={() => { setStep("credentials"); setOtp(""); setError(null); setMessage(null); }}>
-                Change email / phone
+                Back to sign in options
               </button>
             )}
           </form>
