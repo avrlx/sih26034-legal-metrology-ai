@@ -16,6 +16,7 @@ DATE = re.compile(r"\b(\d{1,2})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{2,4})\b|\b(\d{1,
 MONTHS = {name: number for number, name in enumerate(("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"), 1)}
 
 NOISE = re.compile(r"\b(?:INGREDIENTS?|NUTRITIONAL\s+INFORMATION|SERVING\s+SIZE|PER\s+100\s+G|PER\s+SERVE|KEEP\s+YOUR\s+CITY\s+CLEAN|PLEASE\s+RECYCLE|ILLUSTRATIVE\s+PURPOSE|FSSAI|LIC\.?\s*NO|BATCH\s+NO|TRANS\s+FAT|CHOLESTEROL|SODIUM|CARBOHYDRATE|PROTEIN|TOTAL\s+SUGARS?|ADDED\s+SUGARS?|TOTAL\s+FAT|SATURATED\s+FAT|ENERGY\s*\(\s*KCAL\s*\)|www\.)\b", re.I)
+PRODUCT_SLOGAN_START = re.compile(r"^(?:FOR|WITH|THE|NEW|NOW|MADE|RICH|REAL|GOOD|GREAT|TASTY|ORIGINAL|SINCE|NO\.?\s*1|NUMBER\s*1)\b", re.I)
 
 
 def _items(fields: dict[str, Any]) -> list[dict[str, Any]]:
@@ -87,17 +88,12 @@ def _extract_mrp(items: list[dict[str, Any]]) -> dict[str, Any] | None:
                     continue
                 candidate = items[j]
                 text = candidate["text"].strip()
-                # Never treat percentages, unit-sale-price text, or nutrition-style
-                # "per ..." values as the retail MRP amount.
                 if UNIT_PRICE.search(text) or "%" in text or re.search(r"\b(?:PER|USP|UNIT\s+SALE)\b", text, re.I):
                     continue
                 match = PRICE.fullmatch(text) or PRICE.search(text)
                 if not match:
                     continue
                 amount = float(match.group(1))
-                # A retail sale price of zero is not a valid candidate. OCR pipelines
-                # can emit zero-valued decoys from punctuation/noise; keep them out
-                # of the MRP decision instead of allowing a nearby 0.0 to win.
                 if amount <= 0:
                     continue
                 score = 100 - distance * 12 + candidate["confidence"] * 10
@@ -129,26 +125,40 @@ def _extract_unit_sale_price(items: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def _clean_candidate(text: str) -> bool:
-    if NOISE.search(text) or re.search(r"[₹@\d]|https?://|www\.", text, re.I):
+    text = text.strip(" .:-")
+    if NOISE.search(text) or PRODUCT_SLOGAN_START.search(text) or re.search(r"[₹@\d]|https?://|www\.", text, re.I):
         return False
-    if not re.fullmatch(r"[A-Za-z][A-Za-z &'’\-]{2,59}", text.strip(" .:-")):
+    if not re.fullmatch(r"[A-Za-z][A-Za-z &'’\-]{2,59}", text):
         return False
-    return 2 <= len(text.split()) <= 5
+    word_count = len(text.split())
+    # Product names are often a single branded token such as "Parle-G" or
+    # "Surf-excel". Keep those when they have a distinctive hyphen, while
+    # rejecting short marketing fragments such as "for Genius".
+    if word_count == 1:
+        return bool("-" in text or len(text) >= 4)
+    return 2 <= word_count <= 5
 
 
 def _extract_product(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = []
     for item in items:
         text = item["text"].strip(" .:-")
-        if item["confidence"] >= 0.90 and _clean_candidate(text) and not text.isupper() and not text.islower():
-            score = item["confidence"] * 10
-            score += 12 * sum(word[:1].isupper() for word in text.split()) / len(text.split())
-            if re.search(r"\b(?:biscuit|shampoo|soap|toothpaste|tea|flour|rice|oil|juice|drink|cream|lotion)\b", text, re.I):
-                score += 12
-            item["_product_score"] = score
-    candidates = [item for item in items if "_product_score" in item]
+        if item["confidence"] < 0.88 or not _clean_candidate(text):
+            continue
+        if text.isupper() or text.islower():
+            continue
+        score = item["confidence"] * 10
+        score += 12 * sum(word[:1].isupper() for word in text.split()) / max(1, len(text.split()))
+        if "-" in text:
+            score += 10
+        if re.search(r"\b(?:biscuit|shampoo|soap|toothpaste|tea|flour|rice|oil|juice|drink|cream|lotion|milk|salt|honey)\b", text, re.I):
+            score += 12
+        # Standalone OCR headings are much more likely to be the actual product
+        # name than small marketing slogans, so keep a mild confidence margin.
+        candidates.append((score, item))
     if not candidates:
         return None
-    item = max(candidates, key=lambda x: x["_product_score"])
+    _, item = max(candidates, key=lambda x: x[0])
     return {"value": item["text"], **_ev(item, "standalone_product_heading")}
 
 
