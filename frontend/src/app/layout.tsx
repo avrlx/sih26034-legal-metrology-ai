@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { AuthUserMenu } from "@/components/auth-user-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,9 +24,27 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (() => {
+                try {
+                  const saved = localStorage.getItem("complyvision-theme");
+                  const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+                  document.documentElement.classList.toggle("dark", dark);
+                } catch (_) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
-        <div className="pointer-events-none fixed right-4 top-4 z-[60]">
+        <div className="pointer-events-none fixed right-4 top-4 z-[60] flex items-center gap-2">
+          <div className="pointer-events-auto">
+            <ThemeToggle />
+          </div>
           <div className="pointer-events-auto">
             <AuthUserMenu />
           </div>
