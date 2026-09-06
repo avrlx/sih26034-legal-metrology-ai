@@ -44,14 +44,19 @@ CORE_FIELDS = (
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
-    # The package workflow needs text detection + English recognition, not the
-    # heavier document-parser models. PP-OCRv5 mobile models are intentionally
-    # selected for local CPU-friendly inspection latency.
+    # Declaration extraction needs text detection + English recognition, not
+    # document parsing. PP-OCRv5 mobile models are substantially lighter than
+    # the server models and are intended for efficient local deployment.
     detection_model = os.getenv("SIH_OCR_DETECTION_MODEL", "PP-OCRv5_mobile_det")
     recognition_model = os.getenv("SIH_OCR_RECOGNITION_MODEL", "en_PP-OCRv5_mobile_rec")
+    device = os.getenv("SIH_OCR_DEVICE", "cpu")
     return PaddleOCR(
         text_detection_model_name=detection_model,
         text_recognition_model_name=recognition_model,
+        text_recognition_batch_size=int(os.getenv("SIH_OCR_RECOGNITION_BATCH", "4")),
+        text_det_limit_side_len=int(os.getenv("SIH_OCR_DET_LIMIT", "960")),
+        text_det_limit_type="max",
+        device=device,
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
         use_textline_orientation=False,
@@ -80,13 +85,7 @@ def _has_value(value: Any) -> bool:
 
 
 def _needs_ocr_verification(fields: dict[str, Any]) -> bool:
-    """Use a second OCR view only when a mandatory declaration is actually missing.
-
-    A low-but-usable OCR confidence is still evaluated by the deterministic rule
-    engine. Re-running OCR merely because a score is below 0.82 caused an extra
-    full-image inference for many otherwise usable packages and was a major
-    latency multiplier.
-    """
+    """Use a second OCR view only when a mandatory declaration is missing."""
     return any(not _has_value(fields.get(name)) for name in CORE_FIELDS)
 
 
@@ -178,24 +177,16 @@ class PackageAnalyzer:
                 glyph_debug_path = evidence_root / "glyph.jpg"
                 with self._inference_lock:
                     ocr = self._get_ocr()
-                    batch_result = self._image_processor(
-                        path,
-                        ocr,
-                        debug_path=glyph_debug_path,
-                    )
+                    batch_result = self._image_processor(path, ocr, debug_path=glyph_debug_path)
 
-                    primary_fields = enhance_extracted_fields(
-                        batch_result.get("extracted_fields") or {}
-                    )
+                    primary_fields = enhance_extracted_fields(batch_result.get("extracted_fields") or {})
                     primary_fields = correct_mrp(primary_fields)
                     batch_result["extracted_fields"] = primary_fields
 
                     if _needs_ocr_verification(primary_fields):
                         primary_items = primary_fields.get("ocr_evidence") or []
                         ensemble_items, ensemble_meta = run_ocr_ensemble(
-                            ocr,
-                            str(path),
-                            primary_items=primary_items,
+                            ocr, str(path), primary_items=primary_items,
                         )
                     else:
                         ensemble_items = []
@@ -223,21 +214,15 @@ class PackageAnalyzer:
                     safe_result.get("extracted_fields") or {}, ensemble_fields
                 )
 
-            safe_result["extracted_fields"] = enhance_extracted_fields(
-                safe_result.get("extracted_fields") or {}
-            )
+            safe_result["extracted_fields"] = enhance_extracted_fields(safe_result.get("extracted_fields") or {})
             safe_result["extracted_fields"] = correct_mrp(safe_result["extracted_fields"])
 
             extracted_fields = dict(safe_result.get("extracted_fields") or {})
             extracted_fields["font_height_measurement"] = safe_result.get("glyph_measurement")
             if safe_result.get("principal_display_panel_area_cm2") is not None:
-                extracted_fields["principal_display_panel_area_cm2"] = safe_result[
-                    "principal_display_panel_area_cm2"
-                ]
+                extracted_fields["principal_display_panel_area_cm2"] = safe_result["principal_display_panel_area_cm2"]
             if safe_result.get("package_surface_formed") is not None:
-                extracted_fields["package_surface_formed"] = safe_result[
-                    "package_surface_formed"
-                ]
+                extracted_fields["package_surface_formed"] = safe_result["package_surface_formed"]
             safe_result["extracted_fields"] = extracted_fields
 
             report = self._report_builder(safe_result)
