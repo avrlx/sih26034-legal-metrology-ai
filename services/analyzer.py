@@ -43,8 +43,15 @@ CORE_FIELDS = (
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
+    # This application analyzes mostly upright product labels. Disable the
+    # document-level orientation/unwarping models so the normal request path
+    # loads only the OCR detection/recognition models it actually needs.
+    # PaddleOCR documents these switches as supported pipeline parameters.
     return PaddleOCR(
         lang="en",
+        use_doc_orientation_classify=False,
+        use_doc_unwarping=False,
+        use_textline_orientation=False,
         enable_mkldnn=False,
     )
 
@@ -76,8 +83,6 @@ def _needs_ocr_verification(fields: dict[str, Any]) -> bool:
         value = fields.get(name)
         if not _has_value(value) or _confidence(value) < 0.82:
             missing_or_weak += 1
-    # Good, clean packages take the fast path. Ambiguous packages get one
-    # contrast verification pass so accuracy is improved where it matters.
     return missing_or_weak > 0
 
 
@@ -145,6 +150,10 @@ class PackageAnalyzer:
     def ocr_initialized(self) -> bool:
         return self._ocr is not None
 
+    def warm_up(self) -> None:
+        """Load OCR models before the first user-facing inspection request."""
+        self._get_ocr()
+
     def _get_ocr(self) -> Any:
         if self._ocr is None:
             with self._initialization_lock:
@@ -171,9 +180,6 @@ class PackageAnalyzer:
                         debug_path=glyph_debug_path,
                     )
 
-                    # Improve semantic field selection before deciding whether a
-                    # second OCR view is actually necessary. Most clear packages
-                    # now take one OCR pass; difficult packages get one CLAHE pass.
                     primary_fields = enhance_extracted_fields(
                         batch_result.get("extracted_fields") or {}
                     )
