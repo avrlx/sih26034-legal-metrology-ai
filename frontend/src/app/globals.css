@@ -16,6 +16,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -127,6 +128,32 @@
 .dark [class~="text-slate-950/80"] { color: oklch(0.92 0.012 225) !important; }
 .dark [class~="text-slate-900/80"] { color: oklch(0.9 0.012 225) !important; }
 .dark [class~="text-slate-700/80"] { color: oklch(0.82 0.018 225) !important; }
+
+/* Explicitly theme opacity backgrounds used by the dashboard banners. */
+.dark [class~="bg-sky-50/60"] {
+  background: oklch(0.21 0.055 225) !important;
+  border-color: oklch(0.58 0.14 215) !important;
+  color: oklch(0.94 0.012 225) !important;
+}
+.dark [class~="bg-sky-50/60"] [class~="text-sky-950"] {
+  color: oklch(0.86 0.12 215) !important;
+}
+.dark [class~="bg-sky-50/60"] [class~="text-slate-600"] {
+  color: oklch(0.84 0.018 225) !important;
+}
+.dark [class~="bg-sky-50/60"] button {
+  background-color: oklch(0.22 0.045 235) !important;
+  color: oklch(0.93 0.012 225) !important;
+  border-color: oklch(0.55 0.12 215) !important;
+}
+.dark [class~="bg-sky-50/60"] button:hover {
+  background-color: oklch(0.28 0.06 230) !important;
+  color: oklch(0.98 0.008 225) !important;
+}
+.dark [class~="bg-sky-50/50"],
+.dark [class~="bg-sky-50/70"] {
+  background-color: oklch(0.22 0.045 230) !important;
+}
 
 .dark .border-slate-100 { border-color: oklch(0.3 0.03 235) !important; }
 .dark .border-slate-200 { border-color: oklch(0.34 0.035 235) !important; }
