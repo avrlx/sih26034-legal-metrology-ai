@@ -55,9 +55,6 @@ export default function LoginPage() {
       if (!fullName.trim()) throw new Error("Enter your full name.");
       if (!email.trim()) throw new Error("Enter the email address that will be linked to this account.");
       if (!validPhone(phone)) throw new Error("Enter a valid phone number in international format, for example +919876543210.");
-      if (identifierMode === "email" && primaryPhone === normalizePhone(phone)) {
-        // The comparison is intentionally harmless; the two identifiers are different by type.
-      }
     }
 
     const options = mode === "signup"
