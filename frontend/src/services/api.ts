@@ -79,7 +79,7 @@ export async function analyzePackage(file: File): Promise<CanonicalReport> {
     throw new ApiError("The service returned an invalid canonical report.");
   }
 
-  await saveInspection(body, file.name);
+  await saveInspection(body, file);
   return body;
 }
 
