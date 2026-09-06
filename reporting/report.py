@@ -212,13 +212,19 @@ def _reason_codes(
             "REVIEW": "CONTRAST_UNCERTAIN", "NOT_APPLICABLE": "NOT_APPLICABLE",
         }[status]
         codes = [code]
+        #change 3->
     elif field_name == "net_quantity_font_height":
-        codes = [
-            "NOT_APPLICABLE_QUANTITY_TYPE"
-            if status == "NOT_APPLICABLE" else "MEASUREMENT_NOT_VALIDATED"
-        ]
+        if status == "NOT_APPLICABLE":
+            codes = ["NOT_APPLICABLE_QUANTITY_TYPE"]
+        elif status == "PASS":
+            codes = ["NUMERAL_HEIGHT_COMPLIANT"]
+        elif status == "FAIL":
+            codes = ["NUMERAL_HEIGHT_NON_COMPLIANT"]
+        else:
+            codes = ["MEASUREMENT_NOT_VALIDATED"]
         if not (batch_result.get("aruco") or {}).get("detected"):
             codes.append("CALIBRATION_UNAVAILABLE")
+
     elif status == "NOT_APPLICABLE":
         codes = ["NOT_APPLICABLE_QUANTITY_TYPE"]
     elif status == "PASS":
@@ -316,7 +322,12 @@ def _evidence_confidence(evidence: list[dict[str, Any]]) -> float | None:
 def build_rule_results(
     fields: dict[str, Any], extracted: dict[str, Any], batch_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    #change 2 in report.py ->
+    glyph = (batch_result or {}).get("glyph_measurement")
+    if isinstance(glyph, dict):
+        fields["net_quantity_font_height_measurement"] = glyph
     compliance = evaluate_compliance(fields)
+
     results = []
     for rule in compliance["results"]:
         status = rule["status"]
