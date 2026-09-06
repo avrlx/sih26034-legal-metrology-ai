@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -74,12 +75,10 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
     async def warm_ocr_model() -> None:
         """Load OCR before the demo starts so the first upload is not penalized."""
         try:
-            LOGGER.info("Loading PaddleOCR model during API startup...")
+            LOGGER.info("Loading PaddleOCR mobile OCR models during API startup...")
             await run_in_threadpool(app.state.analyzer.warm_up)
             LOGGER.info("PaddleOCR model ready; inspection requests are warm")
         except Exception:
-            # Do not prevent the API from starting; the first request can still
-            # initialize the analyzer lazily and surface a normal analysis error.
             LOGGER.exception("PaddleOCR warm-up failed; lazy initialization remains enabled")
 
     @app.get("/health", response_model=HealthResponse)
@@ -91,6 +90,7 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
         request: Request,
         file: Annotated[UploadFile, File(description="JPEG or PNG package image")],
     ) -> dict[str, Any]:
+        started = time.perf_counter()
         if not file.filename:
             raise HTTPException(status_code=400, detail="An image file is required")
         media = SUPPORTED_UPLOADS.get((file.content_type or "").lower())
@@ -111,9 +111,7 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
                         if total_bytes > maximum_bytes:
                             raise HTTPException(
                                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                                detail=(
-                                    "Image exceeds the configured prototype upload-size limit"
-                                ),
+                                detail="Image exceeds the configured prototype upload-size limit",
                             )
                         output.write(chunk)
                 if total_bytes == 0:
@@ -121,23 +119,30 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
                 if cv2.imread(str(temporary_path)) is None:
                     raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
                 analyzer_service: PackageAnalyzer = request.app.state.analyzer
-                return await run_in_threadpool(
+                report = await run_in_threadpool(
                     analyzer_service.analyze_package,
                     temporary_path,
                     display_filename=f"uploaded_image{media['temporary_suffix']}",
                 )
+                elapsed = time.perf_counter() - started
+                LOGGER.info(
+                    "Compliance report generated in %.2fs (file=%s, bytes=%d)",
+                    elapsed,
+                    file.filename,
+                    total_bytes,
+                )
+                report.setdefault("processing", {})["elapsed_seconds"] = round(elapsed, 3)
+                report["processing"]["target_seconds"] = 30
+                report["processing"]["latency_target_met"] = elapsed < 30.0
+                return report
         except HTTPException:
             raise
         except PackageAnalysisError:
             LOGGER.exception("Package analysis failed")
-            raise HTTPException(
-                status_code=500, detail="Package analysis could not be completed"
-            ) from None
+            raise HTTPException(status_code=500, detail="Package analysis could not be completed") from None
         except Exception:
             LOGGER.exception("Unexpected package-analysis API failure")
-            raise HTTPException(
-                status_code=500, detail="Package analysis could not be completed"
-            ) from None
+            raise HTTPException(status_code=500, detail="Package analysis could not be completed") from None
         finally:
             await file.close()
 
