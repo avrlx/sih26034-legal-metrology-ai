@@ -10,6 +10,8 @@ type IdentifierMode = "email" | "phone";
 type AuthMode = "login" | "signup";
 type Step = "credentials" | "primary-otp" | "secondary-contact" | "secondary-otp";
 
+const DEMO_PHONE_OTP = "123456";
+
 function normalizePhone(value: string): string {
   return value.trim().replace(/[\s()-]/g, "");
 }
@@ -61,13 +63,8 @@ export default function LoginPage() {
     } else {
       if (!validPhone(phone)) throw new Error("Enter a valid phone number in international format, for example +919876543210.");
       const normalized = normalizePhone(phone);
-      const { error: authError } = await supabase.auth.signInWithOtp({
-        phone: normalized,
-        options: { shouldCreateUser: mode === "signup", data: mode === "signup" ? { full_name: fullName.trim() } : undefined },
-      });
-      if (authError) throw authError;
       setPhone(normalized);
-      setMessage(`We sent a one-time code to ${normalized}.`);
+      setMessage(`Demo phone OTP for ${normalized}: ${DEMO_PHONE_OTP}`);
     }
 
     setStep("primary-otp");
@@ -86,12 +83,24 @@ export default function LoginPage() {
       });
       if (authError) throw authError;
     } else {
-      const { error: authError } = await supabase.auth.verifyOtp({
-        phone: normalizePhone(phone),
-        token,
-        type: "sms",
+      if (token !== DEMO_PHONE_OTP) {
+        throw new Error(`Invalid demo OTP. Use ${DEMO_PHONE_OTP}.`);
+      }
+
+      const { error: authError } = await supabase.auth.signInAnonymously({
+        options: {
+          data: {
+            full_name: mode === "signup" ? fullName.trim() : "Demo Inspector",
+            demo_phone: normalizePhone(phone),
+            auth_mode: "phone-demo",
+          },
+        },
       });
-      if (authError) throw authError;
+      if (authError) {
+        throw new Error(
+          `Phone demo authentication is not enabled in Supabase. Enable Anonymous Sign-Ins in Authentication → Sign In / Providers, then try again. (${authError.message})`,
+        );
+      }
     }
 
     if (mode === "login") {
@@ -101,7 +110,9 @@ export default function LoginPage() {
 
     setOtp("");
     setStep("secondary-contact");
-    setMessage(`Primary ${identifierMode} verified. Now add your ${secondaryMode} so the same account supports both login methods.`);
+    setMessage(
+      `Primary ${identifierMode} verified. Now add your ${secondaryMode} so the same demo session can be upgraded to a normal account.`,
+    );
   }
 
   async function sendSecondaryOtp() {
