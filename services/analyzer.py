@@ -44,9 +44,6 @@ CORE_FIELDS = (
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
-    # Declaration extraction needs text detection + English recognition, not
-    # document parsing. PP-OCRv5 mobile models are substantially lighter than
-    # the server models and are intended for efficient local deployment.
     detection_model = os.getenv("SIH_OCR_DETECTION_MODEL", "PP-OCRv5_mobile_det")
     recognition_model = os.getenv("SIH_OCR_RECOGNITION_MODEL", "en_PP-OCRv5_mobile_rec")
     device = os.getenv("SIH_OCR_DEVICE", "cpu")
@@ -85,8 +82,14 @@ def _has_value(value: Any) -> bool:
 
 
 def _needs_ocr_verification(fields: dict[str, Any]) -> bool:
-    """Use a second OCR view only when a mandatory declaration is missing."""
-    return any(not _has_value(fields.get(name)) for name in CORE_FIELDS)
+    """Use a second OCR view only for missing or genuinely low-confidence declarations."""
+    for name in CORE_FIELDS:
+        value = fields.get(name)
+        if not _has_value(value):
+            return True
+        if _confidence(value) >= 0 and _confidence(value) < 0.50:
+            return True
+    return False
 
 
 def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -> dict[str, Any]:
