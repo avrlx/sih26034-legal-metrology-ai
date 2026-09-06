@@ -7,6 +7,7 @@ export interface InspectionRecord {
   status: "PASS" | "FAIL" | "REVIEW";
   product_name: string | null;
   source_filename: string | null;
+  source_image_data_url: string | null;
   report: CanonicalReport;
   created_at: string;
 }
@@ -25,7 +26,7 @@ export async function fetchInspections(limit = 100): Promise<InspectionRecord[]>
 
   const { data, error } = await supabase
     .from("inspections")
-    .select("id,status,product_name,source_filename,report,created_at")
+    .select("id,status,product_name,source_filename,source_image_data_url,report,created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
 
