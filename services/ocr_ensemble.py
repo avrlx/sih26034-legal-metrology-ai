@@ -1,10 +1,9 @@
 """Multi-view OCR consensus for package-label extraction.
 
-The prototype previously trusted a single OCR pass. This module runs the same
-PaddleOCR model over the original image plus two conservative contrast/sharpness
-views, then boosts confidence only when the views agree spatially and textually.
-It never invents text and falls back to the original pass if a secondary view
-fails.
+The primary analysis already performs one OCR pass. The ensemble therefore adds
+only one conservative contrast-enhanced pass, cutting the old four-inference
+request path to at most two OCR inferences while retaining a genuine consensus
+signal when both views agree.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ def _iou(a: list[int], b: list[int]) -> float:
     ax1, ay1, ax2, ay2 = a[:4]
     bx1, by1, bx2, by2 = b[:4]
     ix1, iy1 = max(ax1, bx1), max(ay1, by1)
-    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    ix2, iy2 = min(ax2, by2), min(ay2, by2)
     iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
     intersection = iw * ih
     if intersection <= 0:
@@ -50,13 +49,13 @@ def _variants(image_path: str) -> list[Any]:
     if image is None:
         return [image_path]
 
+    # Keep the original image plus one high-value contrast view. The original
+    # pass is already performed by PackageAnalyzer, so this makes the ensemble
+    # a two-view consensus instead of repeating three expensive OCR inferences.
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
     clahe_bgr = cv2.cvtColor(clahe, cv2.COLOR_GRAY2BGR)
-
-    blurred = cv2.GaussianBlur(image, (0, 0), 1.0)
-    sharpened = cv2.addWeighted(image, 1.35, blurred, -0.35, 0)
-    return [image, clahe_bgr, sharpened]
+    return [image, clahe_bgr]
 
 
 def _merge_passes(passes: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
@@ -84,17 +83,14 @@ def _merge_passes(passes: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
         result["ocr_ensemble"] = True
         if votes >= 2:
             base = max(float(item.get("confidence", 0.0) or 0.0) for item in cluster)
-            # Consensus is evidence about recognition stability, not a fabricated
-            # probability. Cap the boost so weak but repeated noise cannot become 1.0.
-            boost = 0.08 if votes == 2 else 0.12
-            result["confidence"] = round(min(0.99, base + boost), 3)
+            result["confidence"] = round(min(0.99, base + 0.08), 3)
             result["consensus_confidence"] = result["confidence"]
         merged.append(result)
     return merged
 
 
 def run_ocr_ensemble(ocr: Any, image_path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Return spatially-consistent OCR evidence from up to three image views."""
+    """Return spatially-consistent OCR evidence from at most two image views."""
     passes: list[list[dict[str, Any]]] = []
     errors: list[str] = []
     for variant in _variants(image_path):
