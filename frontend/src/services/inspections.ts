@@ -18,7 +18,34 @@ function productName(report: CanonicalReport): string | null {
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
 }
 
-export async function saveInspection(report: CanonicalReport, sourceFilename: string) {
+async function createSourcePreview(file: File): Promise<string | null> {
+  try {
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+
+      const maxDimension = 900;
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const width = Math.max(1, Math.round(image.naturalWidth * scale));
+      const height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      context.drawImage(image, 0, 0, width, height);
+      return canvas.toDataURL("image/jpeg", 0.72);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  } catch {
+    return null;
+  }
+}
+
+export async function saveInspection(report: CanonicalReport, sourceFile: File) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
     return;
   }
@@ -29,11 +56,14 @@ export async function saveInspection(report: CanonicalReport, sourceFilename: st
 
   if (!user) return;
 
+  const sourceImageDataUrl = await createSourcePreview(sourceFile);
+
   const { error } = await supabase.from("inspections").insert({
     user_id: user.id,
     status: report.summary.overall_status,
     product_name: productName(report),
-    source_filename: sourceFilename,
+    source_filename: sourceFile.name,
+    source_image_data_url: sourceImageDataUrl,
     report,
   });
 
