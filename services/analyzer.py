@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import tempfile
 from pathlib import Path
@@ -43,12 +44,14 @@ CORE_FIELDS = (
 def _default_ocr_factory() -> Any:
     from paddleocr import PaddleOCR
 
-    # This application analyzes mostly upright product labels. Disable the
-    # document-level orientation/unwarping models so the normal request path
-    # loads only the OCR detection/recognition models it actually needs.
-    # PaddleOCR documents these switches as supported pipeline parameters.
+    # The package workflow needs text detection + English recognition, not the
+    # heavier document-parser models. PP-OCRv5 mobile models are intentionally
+    # selected for local CPU-friendly inspection latency.
+    detection_model = os.getenv("SIH_OCR_DETECTION_MODEL", "PP-OCRv5_mobile_det")
+    recognition_model = os.getenv("SIH_OCR_RECOGNITION_MODEL", "en_PP-OCRv5_mobile_rec")
     return PaddleOCR(
-        lang="en",
+        text_detection_model_name=detection_model,
+        text_recognition_model_name=recognition_model,
         use_doc_orientation_classify=False,
         use_doc_unwarping=False,
         use_textline_orientation=False,
@@ -77,13 +80,14 @@ def _has_value(value: Any) -> bool:
 
 
 def _needs_ocr_verification(fields: dict[str, Any]) -> bool:
-    """Run the expensive contrast OCR only when primary extraction needs help."""
-    missing_or_weak = 0
-    for name in CORE_FIELDS:
-        value = fields.get(name)
-        if not _has_value(value) or _confidence(value) < 0.82:
-            missing_or_weak += 1
-    return missing_or_weak > 0
+    """Use a second OCR view only when a mandatory declaration is actually missing.
+
+    A low-but-usable OCR confidence is still evaluated by the deterministic rule
+    engine. Re-running OCR merely because a score is below 0.82 caused an extra
+    full-image inference for many otherwise usable packages and was a major
+    latency multiplier.
+    """
+    return any(not _has_value(fields.get(name)) for name in CORE_FIELDS)
 
 
 def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -> dict[str, Any]:
@@ -201,7 +205,7 @@ class PackageAnalyzer:
                             "consensus_items": 0,
                             "errors": [],
                             "skipped": True,
-                            "reason": "primary_declarations_sufficient",
+                            "reason": "mandatory_declarations_sufficient",
                         }
 
                 if batch_result.get("failure_stage") == "unexpected_exception":
