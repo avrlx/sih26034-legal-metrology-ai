@@ -1,6 +1,6 @@
-# SIH26034 Legal Metrology AI
+# ComplyVision
 
-PackSure is an SIH 2026 decision-support prototype for evidence-backed review of declarations on packaged commodities. A Next.js dashboard sends one package image to the existing FastAPI analysis pipeline and renders the canonical compliance report without duplicating OCR, computer-vision, extraction, measurement, or Legal Metrology rule logic in the browser.
+ComplyVision is an SIH 2026 decision-support prototype for evidence-backed review of declarations on packaged commodities. A Next.js dashboard sends one package image to the existing FastAPI analysis pipeline and renders the canonical compliance report without duplicating OCR, computer-vision, extraction, measurement, or Legal Metrology rule logic in the browser.
 
 > This project does not produce an official government compliance certificate or legal opinion.
 
@@ -52,7 +52,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Select a JPEG or PNG package image and choose **Analyze package**.
+Open [http://localhost:3000](http://localhost:3000). Choose **New Inspection**, select a JPEG or PNG package image and choose **Analyze package**.
 
 Frontend environment variables:
 
@@ -87,7 +87,9 @@ Uploads and intermediate overlays use request-isolated temporary storage and are
 
 ## Dashboard behavior
 
-The frontend provides three states:
+The workspace provides a dashboard, session history, findings, analytics, a read-only rule catalog, and JSON/Markdown exports. Reports are kept only in browser memory for the current page session; reloading clears them. No Supabase configuration is needed.
+
+The inspection flow provides three states:
 
 1. Upload with drag-and-drop, browse, filename, size, and format validation.
 2. A non-streaming pipeline visualization while the single `POST /analyze` request runs.
@@ -146,7 +148,7 @@ The benchmark reuses `PackageAnalyzer` and writes ignored JSON, CSV, and Markdow
 
 ## Known limitations
 
-- This is a local prototype with no authentication, database, scan history, admin functions, or PDF export.
+- This is a local prototype with no authentication, database persistence, admin functions, or PDF export. Session history clears on reload.
 - PaddleOCR first-request initialization is slower than subsequent analyses.
 - Analysis is synchronous from the browser's perspective; pipeline stages are a UI representation, not server-sent progress.
 - Physical numeral-height evidence remains `REVIEW` until independently validated.

@@ -18,7 +18,7 @@ const mockedDemo = vi.mocked(loadDemoSample);
 
 describe("AnalysisWorkspace", () => {
   beforeEach(() => {
-    mockedHealth.mockResolvedValue({ status: "ok", service: "PackSure" });
+    mockedHealth.mockResolvedValue({ status: "ok", service: "ComplyVision" });
     mockedAnalyze.mockResolvedValue(reportFixture());
     mockedDemo.mockResolvedValue(new File(["demo"], "standard-package.jpg", { type: "image/jpeg" }));
   });
@@ -26,6 +26,7 @@ describe("AnalysisWorkspace", () => {
   it("accepts a supported file selection and shows its metadata", async () => {
     const user = userEvent.setup();
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     const file = new File([new Uint8Array(2048)], "package.jpg", { type: "image/jpeg" });
 
     await user.upload(screen.getByLabelText("Package image"), file);
@@ -38,6 +39,7 @@ describe("AnalysisWorkspace", () => {
   it("rejects an unsupported file before upload", async () => {
     const user = userEvent.setup({ applyAccept: false });
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
 
     await user.upload(screen.getByLabelText("Package image"), new File(["gif"], "package.gif", { type: "image/gif" }));
 
@@ -51,6 +53,7 @@ describe("AnalysisWorkspace", () => {
     let resolveReport: (value: ReturnType<typeof reportFixture>) => void = () => undefined;
     mockedAnalyze.mockImplementation(() => new Promise((resolve) => { resolveReport = resolve; }));
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "package.jpg", { type: "image/jpeg" }));
 
     await user.click(screen.getByRole("button", { name: /analyze package/i }));
@@ -64,6 +67,7 @@ describe("AnalysisWorkspace", () => {
   it("renders REVIEW as a valid canonical result with returned counts", async () => {
     const user = userEvent.setup();
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "package.jpg", { type: "image/jpeg" }));
     await user.click(screen.getByRole("button", { name: /analyze package/i }));
 
@@ -78,6 +82,7 @@ describe("AnalysisWorkspace", () => {
     const user = userEvent.setup();
     mockedAnalyze.mockRejectedValue(new Error("Analysis could not be completed. Please retry."));
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "package.jpg", { type: "image/jpeg" }));
     await user.click(screen.getByRole("button", { name: /analyze package/i }));
 
@@ -94,6 +99,7 @@ describe("AnalysisWorkspace", () => {
     report.evidence_images = undefined;
     mockedAnalyze.mockResolvedValue(report);
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "package.jpg", { type: "image/jpeg" }));
     await user.click(screen.getByRole("button", { name: /analyze package/i }));
 
@@ -105,9 +111,29 @@ describe("AnalysisWorkspace", () => {
   it("loads a demo image and submits it through the real analysis function", async () => {
     const user = userEvent.setup();
     render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
     await user.click(screen.getByRole("button", { name: "Standard package example" }));
     expect(mockedDemo).toHaveBeenCalledWith("/demo-samples/standard-package.jpg", "standard-package.jpg");
     await user.click(screen.getByRole("button", { name: /analyze package/i }));
     expect(mockedAnalyze).toHaveBeenCalledWith(expect.objectContaining({ name: "standard-package.jpg" }));
   });
+  it("keeps canonical outcomes in session history and clears them on remount", async () => {
+    const user = userEvent.setup();
+    const view = render(<AnalysisWorkspace />);
+    await user.click(screen.getByRole("button", { name: "Start first inspection" }));
+    await user.upload(screen.getByLabelText("Package image"), new File(["jpg"], "session-package.jpg", { type: "image/jpeg" }));
+    await user.click(screen.getByRole("button", { name: /analyze package/i }));
+    await screen.findByText("Overall compliance status");
+    await user.click(screen.getByRole("button", { name: "Inspection History" }));
+    expect(screen.getByText("session-package.jpg")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /session-package\.jpg/ })).toHaveTextContent("REVIEW");
+    await user.click(screen.getByRole("button", { name: "Open report" }));
+    expect(screen.getByText("LM-R7-001 · Rule 7")).toBeInTheDocument();
+    expect(mockedAnalyze).toHaveBeenCalledTimes(1);
+    view.unmount();
+    render(<AnalysisWorkspace />);
+    expect(screen.getByRole("button", { name: "Start first inspection" })).toBeInTheDocument();
+    expect(screen.queryByText("session-package.jpg")).not.toBeInTheDocument();
+  });
+
 });

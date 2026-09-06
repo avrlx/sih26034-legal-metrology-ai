@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -79,6 +80,7 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
         request: Request,
         file: Annotated[UploadFile, File(description="JPEG or PNG package image")],
     ) -> dict[str, Any]:
+        started = time.perf_counter()
         if not file.filename:
             raise HTTPException(status_code=400, detail="An image file is required")
         media = SUPPORTED_UPLOADS.get((file.content_type or "").lower())
@@ -109,11 +111,13 @@ def create_app(analyzer: PackageAnalyzer | None = None) -> FastAPI:
                 if cv2.imread(str(temporary_path)) is None:
                     raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
                 analyzer_service: PackageAnalyzer = request.app.state.analyzer
-                return await run_in_threadpool(
+                report = await run_in_threadpool(
                     analyzer_service.analyze_package,
                     temporary_path,
                     display_filename=f"uploaded_image{media['temporary_suffix']}",
                 )
+                LOGGER.info("Compliance report generated in %.2fs (bytes=%d)", time.perf_counter() - started, total_bytes)
+                return report
         except HTTPException:
             raise
         except PackageAnalysisError:
