@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 from batch_measure import process_image
+from extract_fields import extract_fields
 from reporting.report import build_package_report
 from services.declaration_extractor import add_enhanced_report_fields, enhance_extracted_fields
 from services.evidence import build_evidence_images, scrub_local_paths
 from services.mrp_extractor import correct_mrp
+from services.ocr_ensemble import run_ocr_ensemble
 from services.report_mapping import merge_enhanced_fields
 
 
@@ -26,6 +28,27 @@ def _default_ocr_factory() -> Any:
         lang="en",
         enable_mkldnn=False,
     )
+
+
+def _confidence(value: Any) -> float:
+    if not isinstance(value, dict):
+        return -1.0
+    raw = value.get("confidence", value.get("extraction_confidence"))
+    return float(raw) if isinstance(raw, (int, float)) else -1.0
+
+
+def _merge_field_candidates(primary: dict[str, Any], ensemble: dict[str, Any]) -> dict[str, Any]:
+    """Keep the strongest evidence per field without discarding non-OCR fields."""
+    merged = dict(primary)
+    for name, candidate in ensemble.items():
+        if name == "ocr_evidence" or not isinstance(candidate, dict):
+            continue
+        current = merged.get(name)
+        if not isinstance(current, dict) or _confidence(candidate) > _confidence(current):
+            merged[name] = candidate
+    if ensemble.get("ocr_evidence"):
+        merged["ocr_evidence"] = ensemble["ocr_evidence"]
+    return merged
 
 
 class PackageAnalyzer:
@@ -75,17 +98,34 @@ class PackageAnalyzer:
                 evidence_root = Path(directory)
                 glyph_debug_path = evidence_root / "glyph.jpg"
                 with self._inference_lock:
+                    ocr = self._get_ocr()
                     batch_result = self._image_processor(
                         path,
-                        self._get_ocr(),
+                        ocr,
                         debug_path=glyph_debug_path,
                     )
+                    # A single OCR pass is fast but can be brittle on glare,
+                    # textured packaging and small declaration text. Re-read the
+                    # same image through two conservative visual variants and use
+                    # consensus only when text and geometry agree.
+                    ensemble_items, ensemble_meta = run_ocr_ensemble(ocr, str(path))
                 if batch_result.get("failure_stage") == "unexpected_exception":
                     raise PackageAnalysisError("The analysis pipeline failed unexpectedly")
                 evidence_images = self._evidence_builder(path, batch_result, evidence_root)
             safe_result = scrub_local_paths(batch_result)
             safe_result["evidence_images"] = evidence_images
             safe_result["image"] = Path(display_filename).name
+            safe_result.setdefault("ocr", {})["ensemble"] = ensemble_meta
+
+            # Use the multi-view OCR as a second extraction source. It does not
+            # blindly overwrite the first pass; each declaration keeps whichever
+            # candidate has the stronger evidence score.
+            if ensemble_items:
+                ensemble_fields = enhance_extracted_fields(extract_fields(ensemble_items))
+                ensemble_fields = correct_mrp(ensemble_fields)
+                safe_result["extracted_fields"] = _merge_field_candidates(
+                    safe_result.get("extracted_fields") or {}, ensemble_fields
+                )
 
             # OCR can detect a declaration correctly while the generic field
             # extractor chooses the wrong nearby numeric/text candidate. Run a
@@ -94,8 +134,6 @@ class PackageAnalyzer:
             safe_result["extracted_fields"] = enhance_extracted_fields(
                 safe_result.get("extracted_fields") or {}
             )
-            # MRP is particularly vulnerable to nearby nutrition/unit-price OCR
-            # noise. Re-rank candidates using the MRP label's spatial context.
             safe_result["extracted_fields"] = correct_mrp(safe_result["extracted_fields"])
 
             # Feed measured engineering evidence into the deterministic Rule 7
